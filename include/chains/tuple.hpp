@@ -1,7 +1,10 @@
-#include <tuple>
-#include <utility>
+#include <tuple>       // std::apply, std::forward_as_tuple, std::tuple
+#include <type_traits> // std::is_same_v
+#include <utility>     // std::forward, std::move
+#include <variant>     // std::monostate
 
 #ifndef CHAIN_TUPLE_HPP
+#define CHAIN_TUPLE_HPP
 
 namespace chain::inline v0 {
 
@@ -33,19 +36,6 @@ struct tuple_pipeable {
 template <class T, class F>
 auto operator|(tuple_pipeable<T>&& p, F& f) {
     return tuple_pipeable{void_to_monostate(f)(std::move(p._value))};
-}
-
-/* REVISIT (sparent) : how to forward a value through `just`? */
-
-template <class T>
-struct just_ref {
-    T& _value;
-    just_ref(T& a) : _value{a} {}
-};
-
-template <class T, class F>
-auto operator|(just_ref<T>&& p, F&& f) {
-    return tuple_pipeable{std::apply(std::forward<F>(f), std::move(p._value))};
 }
 
 } // namespace detail

@@ -8,6 +8,10 @@ function(chains_setup_dependencies)
   # For each dependency, see if it's
   # already been provided to us by a parent project
 
+if(NOT TARGET stlab::libraries)
+  cpmaddpackage("gh:stlab/libraries@2.0.0a2")
+endif()
+
   if(NOT TARGET fmtlib::fmtlib)
     cpmaddpackage("gh:fmtlib/fmt#9.1.0")
   endif()

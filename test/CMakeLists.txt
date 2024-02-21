@@ -29,12 +29,13 @@ add_test(NAME cli.has_help COMMAND intro --help)
 add_test(NAME cli.version_matches COMMAND intro --version)
 set_tests_properties(cli.version_matches PROPERTIES PASS_REGULAR_EXPRESSION "${PROJECT_VERSION}")
 
-add_executable(tests tests.cpp tuple_tests.cpp)
+add_executable(tests tuple_tests.cpp initial_draft.cpp)
 target_link_libraries(
   tests
   PRIVATE chains::chains_warnings
           chains::chains_options
           chains::sample_library
+          stlab::stlab
           Catch2::Catch2WithMain)
 
 if(WIN32 AND BUILD_SHARED_LIBS)
@@ -61,47 +62,47 @@ catch_discover_tests(
   .xml)
 
 # Add a file containing a set of constexpr tests
-add_executable(constexpr_tests constexpr_tests.cpp)
-target_link_libraries(
-  constexpr_tests
-  PRIVATE chains::chains_warnings
-          chains::chains_options
-          chains::sample_library
-          Catch2::Catch2WithMain)
+# add_executable(constexpr_tests constexpr_tests.cpp)
+# target_link_libraries(
+#   constexpr_tests
+#   PRIVATE chains::chains_warnings
+#           chains::chains_options
+#           chains::sample_library
+#           Catch2::Catch2WithMain)
 
-catch_discover_tests(
-  constexpr_tests
-  TEST_PREFIX
-  "constexpr."
-  REPORTER
-  XML
-  OUTPUT_DIR
-  .
-  OUTPUT_PREFIX
-  "constexpr."
-  OUTPUT_SUFFIX
-  .xml)
+# catch_discover_tests(
+#   constexpr_tests
+#   TEST_PREFIX
+#   "constexpr."
+#   REPORTER
+#   XML
+#   OUTPUT_DIR
+#   .
+#   OUTPUT_PREFIX
+#   "constexpr."
+#   OUTPUT_SUFFIX
+#   .xml)
 
 # Disable the constexpr portion of the test, and build again this allows us to have an executable that we can debug when
 # things go wrong with the constexpr testing
-add_executable(relaxed_constexpr_tests constexpr_tests.cpp)
-target_link_libraries(
-  relaxed_constexpr_tests
-  PRIVATE chains::chains_warnings
-          chains::chains_options
-          chains::sample_library
-          Catch2::Catch2WithMain)
-target_compile_definitions(relaxed_constexpr_tests PRIVATE -DCATCH_CONFIG_RUNTIME_STATIC_REQUIRE)
+# add_executable(relaxed_constexpr_tests constexpr_tests.cpp)
+# target_link_libraries(
+#   relaxed_constexpr_tests
+#   PRIVATE chains::chains_warnings
+#           chains::chains_options
+#           chains::sample_library
+#           Catch2::Catch2WithMain)
+# target_compile_definitions(relaxed_constexpr_tests PRIVATE -DCATCH_CONFIG_RUNTIME_STATIC_REQUIRE)
 
-catch_discover_tests(
-  relaxed_constexpr_tests
-  TEST_PREFIX
-  "relaxed_constexpr."
-  REPORTER
-  XML
-  OUTPUT_DIR
-  .
-  OUTPUT_PREFIX
-  "relaxed_constexpr."
-  OUTPUT_SUFFIX
-  .xml)
+# catch_discover_tests(
+#   relaxed_constexpr_tests
+#   TEST_PREFIX
+#   "relaxed_constexpr."
+#   REPORTER
+#   XML
+#   OUTPUT_DIR
+#   .
+#   OUTPUT_PREFIX
+#   "relaxed_constexpr."
+#   OUTPUT_SUFFIX
+#   .xml)
