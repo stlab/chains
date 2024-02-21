@@ -29,7 +29,7 @@ add_test(NAME cli.has_help COMMAND intro --help)
 add_test(NAME cli.version_matches COMMAND intro --version)
 set_tests_properties(cli.version_matches PROPERTIES PASS_REGULAR_EXPRESSION "${PROJECT_VERSION}")
 
-add_executable(tests tests.cpp)
+add_executable(tests tests.cpp tuple_tests.cpp)
 target_link_libraries(
   tests
   PRIVATE chains::chains_warnings
