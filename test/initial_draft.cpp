@@ -1,6 +1,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chains/tuple.hpp>
+
 #include <tuple>
 #include <utility>
 
@@ -18,68 +20,7 @@ set on the receiver.
 
 */
 
-namespace stlab::inline v1 {
-
-namespace detail {
-
-/*
-    Operators for fold expression for sequential execution. Simpler way?
-*/
-
-template <class F>
-inline auto void_to_monostate(F& f) {
-    return [&_f = f](auto&&... args) mutable {
-        if constexpr (std::is_same_v<decltype(std::move(_f)(std::forward<decltype(args)>(args)...)),
-                                     void>) {
-            std::move(_f)(std::forward<decltype(args)>(args)...);
-            return std::monostate{};
-        } else {
-            return std::move(_f)(std::forward<decltype(args)>(args)...);
-        }
-    };
-}
-
-template <class T>
-struct pipeable;
-
-template <class T>
-struct pipeable {
-    T _value;
-    pipeable(T&& a) : _value{std::move(a)} {}
-};
-
-template <class T, class F>
-auto operator|(pipeable<T>&& p, F& f) {
-    return pipeable{void_to_monostate(f)(std::move(p._value))};
-}
-
-/* REVISIT (sparent) : how to forward a value through `just`? */
-
-template <class T>
-struct just_ref {
-    T& _value;
-    just_ref(T& a) : _value{a} {}
-};
-
-template <class T, class F>
-auto operator|(just_ref<T>&& p, F&& f) {
-    return pipeable{std::apply(std::forward<F>(f), std::move(p._value))};
-}
-
-} // namespace detail
-
-template <class... Fs>
-auto compose_tuple(std::tuple<Fs...>&& sequence) {
-    return [_sequence = std::move(sequence)](auto&&... args) mutable {
-        return std::move(std::apply(
-                             [_args = std::forward_as_tuple(std::forward<decltype(args)>(args)...)](
-                                 auto&... functions) mutable {
-                                 return (detail::just_ref{_args} | ... | functions);
-                             },
-                             _sequence)
-                             ._value);
-    };
-}
+namespace chain::inline v1 {
 
 /*
 segment is invoked with a receiver -
@@ -96,7 +37,7 @@ class segment {
 public:
     template <class... Args>
     auto result_type_helper(Args&&... args) && {
-        return compose_tuple(std::move(_functions))(std::forward<Args>(args)...);
+        return tuple_compose(std::move(_functions))(std::forward<Args>(args)...);
     }
 
     explicit segment(Applicator&& apply, std::tuple<Fs...>&& functions)
@@ -139,7 +80,7 @@ public:
         if (receiver.canceled()) return;
 
         std::move(_apply)(
-            [_f = compose_tuple(std::move(_functions)),
+            [_f = tuple_compose(std::move(_functions)),
              _receiver = receiver](auto&&... args) mutable noexcept {
                 if (_receiver.canceled()) return;
                 try {
@@ -264,14 +205,14 @@ inline auto operator|(segment<Applicator, Fs...>&& head, F&& f) {
     return chain{std::tuple<>{}, std::move(head).append(std::forward<F>(f))};
 }
 
-} // namespace stlab::inline v1
+} // namespace chain::inline v1
 
 //--------------------------------------------------------------------------------------------------
 
 #include <stlab/concurrency/future.hpp>
 #include <variant>
 
-namespace stlab::inline v1 {
+namespace chain::inline v1 {
 
 #if 0
 template <class E>
@@ -343,7 +284,7 @@ inline auto then(F&& future) {
 
 #endif
 
-} // namespace stlab::inline v1
+} // namespace chain::inline v1
 
 //--------------------------------------------------------------------------------------------------
 
@@ -353,6 +294,7 @@ inline auto then(F&& future) {
 #include <thread>
 
 using namespace std;
+using namespace chain;
 using namespace stlab;
 
 TEST_CASE("Initial draft", "[initial_draft]") {
