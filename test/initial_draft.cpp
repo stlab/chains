@@ -20,7 +20,7 @@ set on the receiver.
 
 */
 
-namespace chain::inline v1 {
+namespace chains::inline v1 {
 
 /*
 segment is invoked with a receiver -
@@ -55,10 +55,9 @@ public:
     segment& operator=(segment&&) noexcept = default;
 
     template <class F>
-    auto append(F&& f) && -> segment<Applicator, Fs..., std::decay_t<F>> {
-        return segment<Applicator, Fs..., std::decay_t<F>>{
-            std::move(_apply),
-            std::tuple_cat(std::move(_functions), std::tuple{std::forward<F>(f)})};
+    auto append(F&& f) && {
+        return chains::segment{std::move(_apply), std::tuple_cat(std::move(_functions),
+                                                                 std::tuple{std::forward<F>(f)})};
     }
 
 #if 0
@@ -101,53 +100,66 @@ using segment_result_type =
     simplify this code by handing the multi-argument case earlier (somehow).
 */
 
+#define STLAB_FWD(x) std::forward<decltype(x)>(x)
+
 template <class Tail, class Applicator, class... Fs>
 class chain {
     Tail _tail;
     segment<Applicator, Fs...> _head;
 
-    template <class Index>
-    auto result_type_helper() && {
-        if constexpr (Index::value == std::tuple_size_v<Tail>) {
-            return [_segment = std::move(_head)](auto&&... args) mutable {
-                return std::move(_segment).result_type_helper(
-                    std::forward<decltype(args)>(args)...);
-            };
-        } else {
-            return
-                [_segment =
-                     std::move(std::get<Index::value>(_tail))
-                         .append(std::move(*this)
-                                     .template result_type_helper<
-                                         std::integral_constant<std::size_t, Index::value + 1>>())](
-                    auto&&... args) mutable {
-                    return std::move(_segment).result_type_helper(
-                        std::forward<decltype(args)>(args)...);
-                };
-        }
+    /// Apply a recursive lambda to each element in _tail, followed by _head.
+    template <class F>
+    auto fold_over(F fold) && {
+        return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); },
+                          std::tuple_cat(std::move(_tail), std::tuple(std::move(_head))));
     }
 
-    template <class Index, class R>
+    template <class F>
+    static consteval auto static_fold_over(F fold) {
+        return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); },
+                          std::tuple_cat(std::declval<Tail>(),
+                                         std::tuple(std::declval<segment<Applicator, Fs...>>())));
+    }
+
+    /// Return a lambda with the signature of
+    /// head( tail<n>( tail<1>( tail<0>( auto&& args... ) ) ) )
+    /// for computing the result type of this chain.
+    static consteval auto result_type_helper() {
+        return static_fold_over([](auto fold, auto&& first, auto&&... rest) {
+            if constexpr (sizeof...(rest) == 0) {
+                return [_segment = STLAB_FWD(first)](auto&&... args) mutable {
+                    return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
+                };
+            } else {
+                return [_segment = STLAB_FWD(first).append(fold(fold, STLAB_FWD(rest)...))](
+                           auto&&... args) mutable {
+                    return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
+                };
+            }
+        });
+    }
+
+    template <class R>
     auto expand(const R& receiver) && {
-        if constexpr (Index::value == std::tuple_size_v<Tail>) {
-            return [_segment = std::move(_head).append(receiver),
-                    _receiver = receiver](auto&&... args) mutable {
-                return std::move(_segment).invoke(_receiver, std::forward<decltype(args)>(args)...);
-            };
-        } else {
-            return [_segment =
-                        std::move(std::get<Index::value>(_tail))
-                            .append(std::move(*this)
-                                        .template expand<
-                                            std::integral_constant<std::size_t, Index::value + 1>>(
-                                            receiver)),
-                    _receiver = receiver](auto&&... args) mutable {
-                return std::move(_segment).invoke(_receiver, std::forward<decltype(args)>(args)...);
-            };
-        }
+        return std::move(*this).fold_over([receiver](auto fold, auto&& first, auto&&... rest) {
+            if constexpr (sizeof...(rest) == 0) {
+                return [receiver,
+                        _segment = STLAB_FWD(first).append(receiver)](auto&&... args) mutable {
+                    return std::move(_segment).invoke(receiver, STLAB_FWD(args)...);
+                };
+            } else {
+                return [receiver, _segment = STLAB_FWD(first).append(
+                                      fold(fold, STLAB_FWD(rest)...))](auto&&... args) mutable {
+                    return std::move(_segment).invoke(receiver, STLAB_FWD(args)...);
+                };
+            }
+        });
     }
 
 public:
+    template <class... Args>
+    using result_type = decltype(result_type_helper()(std::declval<Args>()...));
+
     explicit chain(Tail&& tail, segment<Applicator, Fs...>&& head)
         : _tail{std::move(tail)}, _head{std::move(head)} {}
 
@@ -164,28 +176,21 @@ public:
     // append function to the last sequence
     template <class F>
     auto append(F&& f) && {
-        return chain<Tail, Applicator, Fs..., F>{std::move(_tail),
-                                                 std::move(_head).append(std::forward<F>(f))};
+        return chains::chain{std::move(_tail), std::move(_head).append(std::forward<F>(f))};
     }
 
     template <class I, class... Gs>
     auto append(segment<I, Gs...>&& head) && {
-        using tail_type =
-            decltype(std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))));
-        return chain<tail_type, I, Gs...>{
-            std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))), std::move(head)};
+        return chains::chain{std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))),
+                             std::move(head)};
     }
 
     template <class... Args>
     auto operator()(Args&&... args) && {
-        using result_type =
-            decltype(std::move(*this)
-                         .template result_type_helper<std::integral_constant<std::size_t, 0>>()(
-                             std::forward<Args>(args)...));
+        using result_t = result_type<Args...>;
         auto [receiver, future] =
-            stlab::package<result_type(result_type)>(stlab::immediate_executor, std::identity{});
-        (void)std::move(*this).template expand<std::integral_constant<std::size_t, 0>>(receiver)(
-            std::forward<Args>(args)...);
+            stlab::package<result_t(result_t)>(stlab::immediate_executor, std::identity{});
+        (void)std::move(*this).expand(receiver)(std::forward<Args>(args)...);
         return std::move(future);
     }
 
@@ -200,19 +205,22 @@ public:
     }
 };
 
+template <class Tail, class Applicator, class... Fs>
+chain(Tail&& tail, segment<Applicator, Fs...>&& head) -> chain<Tail, Applicator, Fs...>;
+
 template <class F, class Applicator, class... Fs>
 inline auto operator|(segment<Applicator, Fs...>&& head, F&& f) {
     return chain{std::tuple<>{}, std::move(head).append(std::forward<F>(f))};
 }
 
-} // namespace chain::inline v1
+} // namespace chains::inline v1
 
 //--------------------------------------------------------------------------------------------------
 
 #include <stlab/concurrency/future.hpp>
 #include <variant>
 
-namespace chain::inline v1 {
+namespace chains::inline v1 {
 
 #if 0
 template <class E>
@@ -284,7 +292,7 @@ inline auto then(F&& future) {
 
 #endif
 
-} // namespace chain::inline v1
+} // namespace chains::inline v1
 
 //--------------------------------------------------------------------------------------------------
 
@@ -294,7 +302,7 @@ inline auto then(F&& future) {
 #include <thread>
 
 using namespace std;
-using namespace chain;
+using namespace chains;
 using namespace stlab;
 
 TEST_CASE("Initial draft", "[initial_draft]") {

@@ -6,7 +6,7 @@
 #ifndef CHAIN_TUPLE_HPP
 #define CHAIN_TUPLE_HPP
 
-namespace chain::inline v0 {
+namespace chains::inline v0 {
 
 namespace detail {
 
@@ -58,7 +58,7 @@ auto tuple_compose(std::tuple<Fs...>&& sequence) {
 
 //--------------------------------------------------------------------------------------------------
 
-} // namespace chain::inline v0
+} // namespace chains::inline v0
 
 //--------------------------------------------------------------------------------------------------
 
