@@ -114,11 +114,17 @@ class chain {
                           std::tuple_cat(std::move(_tail), std::tuple(std::move(_head))));
     }
 
+    template <class F>
+    static consteval auto static_fold_over(F fold) {
+              return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); },
+                          std::tuple_cat(std::declval<Tail>(), std::tuple(std::declval<segment<Applicator, Fs...>>())));
+    }
+
     /// Return a lambda with the signature of
     /// head( tail<n>( tail<1>( tail<0>( auto&& args... ) ) ) )
     /// for computing the result type of this chain.
-    auto result_type_helper() && {
-        return std::move(*this).fold_over([](auto fold, auto&& first, auto&&... rest) {
+    static consteval auto result_type_helper() {
+        return static_fold_over([](auto fold, auto&& first, auto&&... rest) {
             if constexpr (sizeof...(rest) == 0) {
                 return [_segment = STLAB_FWD(first)](auto&&... args) mutable {
                     return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
@@ -150,6 +156,9 @@ class chain {
     }
 
 public:
+    template <class... Args>
+    using result_type = decltype(result_type_helper()(std::declval<Args>()...));
+
     explicit chain(Tail&& tail, segment<Applicator, Fs...>&& head)
         : _tail{std::move(tail)}, _head{std::move(head)} {}
 
@@ -177,10 +186,9 @@ public:
 
     template <class... Args>
     auto operator()(Args&&... args) && {
-        using result_type =
-            decltype(std::move(*this).result_type_helper()(std::forward<Args>(args)...));
+        using result_t = result_type<Args...>;
         auto [receiver, future] =
-            stlab::package<result_type(result_type)>(stlab::immediate_executor, std::identity{});
+            stlab::package<result_t(result_t)>(stlab::immediate_executor, std::identity{});
         (void)std::move(*this).expand(receiver)(std::forward<Args>(args)...);
         return std::move(future);
     }
