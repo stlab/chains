@@ -20,7 +20,7 @@ set on the receiver.
 
 */
 
-namespace chain::inline v1 {
+namespace chains::inline v1 {
 
 /*
 segment is invoked with a receiver -
@@ -55,8 +55,8 @@ public:
     segment& operator=(segment&&) noexcept = default;
 
     template <class F>
-    auto append(F&& f) && -> segment<Applicator, Fs..., std::decay_t<F>> {
-        return segment<Applicator, Fs..., std::decay_t<F>>{
+    auto append(F&& f) &&  {
+        return chains::segment {
             std::move(_apply),
             std::tuple_cat(std::move(_functions), std::tuple{std::forward<F>(f)})};
     }
@@ -164,15 +164,13 @@ public:
     // append function to the last sequence
     template <class F>
     auto append(F&& f) && {
-        return chain<Tail, Applicator, Fs..., F>{std::move(_tail),
-                                                 std::move(_head).append(std::forward<F>(f))};
+        return chains::chain{std::move(_tail),
+                             std::move(_head).append(std::forward<F>(f))};
     }
 
     template <class I, class... Gs>
     auto append(segment<I, Gs...>&& head) && {
-        using tail_type =
-            decltype(std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))));
-        return chain<tail_type, I, Gs...>{
+        return chains::chain {
             std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))), std::move(head)};
     }
 
@@ -200,19 +198,22 @@ public:
     }
 };
 
+template <class Tail, class Applicator, class... Fs>
+chain(Tail&& tail, segment<Applicator, Fs...>&& head) -> chain<Tail, Applicator, Fs...>;
+
 template <class F, class Applicator, class... Fs>
 inline auto operator|(segment<Applicator, Fs...>&& head, F&& f) {
     return chain{std::tuple<>{}, std::move(head).append(std::forward<F>(f))};
 }
 
-} // namespace chain::inline v1
+} // namespace chains::inline v1
 
 //--------------------------------------------------------------------------------------------------
 
 #include <stlab/concurrency/future.hpp>
 #include <variant>
 
-namespace chain::inline v1 {
+namespace chains::inline v1 {
 
 #if 0
 template <class E>
@@ -284,7 +285,7 @@ inline auto then(F&& future) {
 
 #endif
 
-} // namespace chain::inline v1
+} // namespace chains::inline v1
 
 //--------------------------------------------------------------------------------------------------
 
@@ -294,7 +295,7 @@ inline auto then(F&& future) {
 #include <thread>
 
 using namespace std;
-using namespace chain;
+using namespace chains;
 using namespace stlab;
 
 TEST_CASE("Initial draft", "[initial_draft]") {

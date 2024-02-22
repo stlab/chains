@@ -11,5 +11,5 @@
 TEST_CASE("Test tuple compose", "[tuple_compose]") {
     std::tuple t{[](int x) { return x + 1.0; }, [](double x) { return x * 2.0; },
                  [](double x) { return std::to_string(x / 2.0); }};
-    REQUIRE(chain::tuple_compose(std::move(t))(1) == "2.000000");
+    REQUIRE(chains::tuple_compose(std::move(t))(1) == "2.000000");
 }
