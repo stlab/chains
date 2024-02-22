@@ -100,50 +100,51 @@ using segment_result_type =
     simplify this code by handing the multi-argument case earlier (somehow).
 */
 
+#define STLAB_FWD(x) std::forward<decltype(x)>(x)
+
 template <class Tail, class Applicator, class... Fs>
 class chain {
     Tail _tail;
     segment<Applicator, Fs...> _head;
 
-    template <class Index>
-    auto result_type_helper() && {
-        if constexpr (Index::value == std::tuple_size_v<Tail>) {
-            return [_segment = std::move(_head)](auto&&... args) mutable {
-                return std::move(_segment).result_type_helper(
-                    std::forward<decltype(args)>(args)...);
-            };
-        } else {
-            return
-                [_segment =
-                     std::move(std::get<Index::value>(_tail))
-                         .append(std::move(*this)
-                                     .template result_type_helper<
-                                         std::integral_constant<std::size_t, Index::value + 1>>())](
-                    auto&&... args) mutable {
-                    return std::move(_segment).result_type_helper(
-                        std::forward<decltype(args)>(args)...);
-                };
-        }
+    /// Apply a recursive lambda to each element in _tail, followed by _head.
+    template <class F>
+    auto fold_over(F fold) && {
+      return std::apply([fold](auto&&... links) {
+        return fold(fold, STLAB_FWD(links)...);
+      }, std::tuple_cat(std::move(_tail), std::tuple(std::move(_head))));
     }
 
-    template <class Index, class R>
+    /// Return a lambda with the signature of
+    /// head( tail<n>( tail<1>( tail<0>( auto&& args... ) ) ) )
+    /// for computing the result type of this chain.
+    auto result_type_helper() && {
+        return std::move(*this).fold_over([](auto fold, auto&& first, auto&&... rest) {
+          if constexpr (sizeof...(rest) == 0) {
+            return [_segment = STLAB_FWD(first)](auto&&... args) mutable {
+              return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
+            };
+          } else {
+            return [_segment = STLAB_FWD(first).append(fold(fold, STLAB_FWD(rest)...))] (auto&&... args) mutable {
+              return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
+            };
+          }
+        });
+    }
+
+    template <class R>
     auto expand(const R& receiver) && {
-        if constexpr (Index::value == std::tuple_size_v<Tail>) {
-            return [_segment = std::move(_head).append(receiver),
-                    _receiver = receiver](auto&&... args) mutable {
-                return std::move(_segment).invoke(_receiver, std::forward<decltype(args)>(args)...);
+        return std::move(*this).fold_over([receiver](auto fold, auto&& first, auto&&... rest) {
+          if constexpr (sizeof...(rest) == 0) {
+            return [receiver, _segment = STLAB_FWD(first).append(receiver)](auto&&... args) mutable {
+              return std::move(_segment).invoke(receiver, STLAB_FWD(args)...);
             };
-        } else {
-            return [_segment =
-                        std::move(std::get<Index::value>(_tail))
-                            .append(std::move(*this)
-                                        .template expand<
-                                            std::integral_constant<std::size_t, Index::value + 1>>(
-                                            receiver)),
-                    _receiver = receiver](auto&&... args) mutable {
-                return std::move(_segment).invoke(_receiver, std::forward<decltype(args)>(args)...);
+          } else {
+            return [receiver, _segment = STLAB_FWD(first).append(fold(fold, STLAB_FWD(rest)...))] (auto&&... args) mutable {
+              return std::move(_segment).invoke(receiver, STLAB_FWD(args)...);
             };
-        }
+          }
+        });
     }
 
 public:
@@ -175,13 +176,10 @@ public:
     template <class... Args>
     auto operator()(Args&&... args) && {
         using result_type =
-            decltype(std::move(*this)
-                         .template result_type_helper<std::integral_constant<std::size_t, 0>>()(
-                             std::forward<Args>(args)...));
+            decltype(std::move(*this).result_type_helper()(std::forward<Args>(args)...));
         auto [receiver, future] =
             stlab::package<result_type(result_type)>(stlab::immediate_executor, std::identity{});
-        (void)std::move(*this).template expand<std::integral_constant<std::size_t, 0>>(receiver)(
-            std::forward<Args>(args)...);
+        (void) std::move(*this).expand(receiver)(std::forward<Args>(args)...);
         return std::move(future);
     }
 
