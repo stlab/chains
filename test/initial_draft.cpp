@@ -55,10 +55,9 @@ public:
     segment& operator=(segment&&) noexcept = default;
 
     template <class F>
-    auto append(F&& f) &&  {
-        return chains::segment {
-            std::move(_apply),
-            std::tuple_cat(std::move(_functions), std::tuple{std::forward<F>(f)})};
+    auto append(F&& f) && {
+        return chains::segment{std::move(_apply), std::tuple_cat(std::move(_functions),
+                                                                 std::tuple{std::forward<F>(f)})};
     }
 
 #if 0
@@ -164,14 +163,13 @@ public:
     // append function to the last sequence
     template <class F>
     auto append(F&& f) && {
-        return chains::chain{std::move(_tail),
-                             std::move(_head).append(std::forward<F>(f))};
+        return chains::chain{std::move(_tail), std::move(_head).append(std::forward<F>(f))};
     }
 
     template <class I, class... Gs>
     auto append(segment<I, Gs...>&& head) && {
-        return chains::chain {
-            std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))), std::move(head)};
+        return chains::chain{std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))),
+                             std::move(head)};
     }
 
     template <class... Args>
