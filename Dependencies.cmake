@@ -13,7 +13,7 @@ if(NOT TARGET stlab::stlab)
     NAME stlab
     VERSION 2.0.0a2
     GITHUB_REPOSITORY "stlab/libraries"
-    OPTIONS "BUILD_TESTING=OFF")
+    OPTIONS "BUILD_TESTING OFF")
 endif()
 
   if(NOT TARGET fmtlib::fmtlib)
