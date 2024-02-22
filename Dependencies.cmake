@@ -8,8 +8,12 @@ function(chains_setup_dependencies)
   # For each dependency, see if it's
   # already been provided to us by a parent project
 
-if(NOT TARGET stlab::libraries)
-  cpmaddpackage("gh:stlab/libraries@2.0.0a2")
+if(NOT TARGET stlab::stlab)
+  cpmaddpackage(
+    NAME stlab
+    VERSION 2.0.0a2
+    GITHUB_REPOSITORY "stlab/libraries"
+    OPTIONS "BUILD_TESTING=OFF")
 endif()
 
   if(NOT TARGET fmtlib::fmtlib)
