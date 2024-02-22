@@ -116,8 +116,9 @@ class chain {
 
     template <class F>
     static consteval auto static_fold_over(F fold) {
-              return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); },
-                          std::tuple_cat(std::declval<Tail>(), std::tuple(std::declval<segment<Applicator, Fs...>>())));
+        return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); },
+                          std::tuple_cat(std::declval<Tail>(),
+                                         std::tuple(std::declval<segment<Applicator, Fs...>>())));
     }
 
     /// Return a lambda with the signature of
