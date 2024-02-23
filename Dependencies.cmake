@@ -11,7 +11,7 @@ function(chains_setup_dependencies)
 if(NOT TARGET stlab::stlab)
   cpmaddpackage(
     NAME stlab
-    VERSION 2.0.0a2
+    VERSION 2.0.0a3
     GITHUB_REPOSITORY "stlab/libraries"
     OPTIONS "BUILD_TESTING OFF")
 endif()
