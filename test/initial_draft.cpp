@@ -247,6 +247,30 @@ inline auto on(E&& executor) {
     }};
 }
 
+/*
+    The `then` algorithm takes a future and returns a segment (chain) that will schedule the
+    segment as a continuation of the future.
+
+    The segment returns void so the future is (kind of) detached - but this should be done without
+   the overhead of a future::detach.
+
+    How is cancellation handled here? Let's say we have this:
+
+    `auto f = start(then(future));`
+
+    And we destruct f. We need to _delete_ the (detached) future. Where is this held? f is only
+   holding the promise.
+*/
+
+#if 0
+template <class F>
+inline auto then(F&& future) {
+    return segment{[_future = std::forward<F>(future)](auto&& f) {
+        return std::move(_future).then(std::forward<decltype(f)>(f));
+    }};
+}
+#endif
+
 // TODO: (sean-parent) - should we make this pipeable?
 
 template <class Chain, class... Args>
@@ -314,9 +338,6 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
     return *receiver.result;
 }
 
-#if 0
-
-
 /*
     TODO: The ergonimics of chains are painful with three arguements. We could reduce to a single
     argument or move to a concept? Here I really want the forward reference to be an rvalue ref.
@@ -326,26 +347,7 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
     the condition that it is ready.
 */
 
-
-template <class Chain>
-inline auto sync_wait(Chain&& chain) {
-    /*
-        TODO: (sean-parent) - we should have an invoke awaiting parameterized on what we are waiting
-        The implementation of which would be used in stlab::await() and used here. With this
-        construct we don't spin up more than one thread (hmm, maybe we shouldn't?).
-    */
-    auto appended = std::forward<Chain>(chain) | [&]
-    invoke_awaiting(
-    );
-}
-#endif
-
 #if 0
-inline auto apply() {
-    return segment{[](auto&& f, auto&&... args) {
-        return std::forward<decltype(f)>(f)(std::forward<decltype(args)>(args)...);
-    }};
-}
 
 template <class F>
 inline auto then(F&& future) {
