@@ -185,6 +185,11 @@ public:
                              std::move(head)};
     }
 
+    template <class Receiver, class... Args>
+    void invoke(Receiver&& receiver, Args&&... args) && {
+        std::move(*this).expand(std::forward<Receiver>(receiver))(std::forward<Args>(args)...);
+    }
+
     template <class... Args>
     auto operator()(Args&&... args) && {
         using result_t = result_type<Args...>;
@@ -222,16 +227,6 @@ inline auto operator|(segment<Applicator, Fs...>&& head, F&& f) {
 
 namespace chains::inline v1 {
 
-#if 0
-template <class E>
-inline auto on(E&& executor) {
-    return segment{[_executor = std::forward<E>(executor)](auto&& f, auto&&... args) mutable {
-        return stlab::async(std::move(_executor), std::forward<decltype(f)>(f),
-                            std::forward<decltype(args)>(args)...);
-    }};
-}
-#endif
-
 /*
 
 Each segment invokes the next segment with result and returns void. Promise is bound to the
@@ -249,6 +244,11 @@ inline auto on(E&& executor) {
         return std::monostate{};
     }};
 }
+
+// TODO: (sean-parent) - whould we make this pipeable?
+
+template <class Chain, class... Args>
+inline auto start(Chain&& chain, Args&&... args) {}
 
 #if 0
 
