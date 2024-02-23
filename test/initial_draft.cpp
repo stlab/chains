@@ -193,11 +193,11 @@ public:
     }
 
     template <class... Args>
-    auto operator()(Args&&... args) && {
+    [[deprecated]] auto operator()(Args&&... args) && {
         using result_t = result_type<Args...>;
         auto [receiver, future] =
             stlab::package<result_t(result_t)>(stlab::immediate_executor, std::identity{});
-        (void)std::move(*this).expand(receiver)(std::forward<Args>(args)...);
+        invoke(std::move(receiver), std::forward<Args>(args)...);
         return std::move(future);
     }
 
@@ -247,10 +247,72 @@ inline auto on(E&& executor) {
     }};
 }
 
-// TODO: (sean-parent) - whould we make this pipeable?
+// TODO: (sean-parent) - should we make this pipeable?
 
 template <class Chain, class... Args>
-inline auto start(Chain&& chain, Args&&... args) {}
+inline auto start(Chain&& chain, Args&&... args) {
+    using result_t = Chain::template result_type<Args...>;
+    auto [receiver, future] =
+        stlab::package<result_t(result_t)>(stlab::immediate_executor, std::identity{});
+    std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
+    return std::move(future);
+}
+
+template <class Receiver>
+struct receiver_ref {
+    Receiver* _receiver;
+    void operator()(auto&&... args) {
+        _receiver->operator()(std::forward<decltype(args)>(args)...);
+    }
+    void set_exception(std::exception_ptr p) { _receiver->set_exception(p); }
+    bool canceled() const { return _receiver->canceled(); }
+};
+
+template <class Chain, class... Args>
+inline auto sync_wait(Chain&& chain, Args&&... args) {
+    using result_t = Chain::template result_type<Args...>;
+
+    struct receiver_t {
+        std::optional<result_t> result;
+        std::exception_ptr error{nullptr};
+        std::mutex m;
+        std::condition_variable cv;
+
+        void operator()(result_t&& value) {
+            {
+                std::lock_guard<std::mutex> lock(m);
+                result = std::move(value);
+            }
+            cv.notify_one();
+        }
+
+        void set_exception(std::exception_ptr p) {
+            {
+                std::lock_guard<std::mutex> lock(m);
+                error = p;
+            }
+            cv.notify_one();
+        }
+
+        bool canceled() const { return false; }
+    } receiver;
+
+    /*
+        REVISIT: (sean-parent) - chain invoke doesn't work with std::ref(receiver). We should fix
+       that but for now create a receiver-ref.
+    */
+
+    std::forward<Chain>(chain).invoke(receiver_ref<receiver_t>{&receiver},
+                                      std::forward<Args>(args)...);
+
+    std::unique_lock<std::mutex> lock(receiver.m);
+    receiver.cv.wait(lock, [&] { return receiver.result.has_value() || receiver.error; });
+
+    if (receiver.error) {
+        std::rethrow_exception(receiver.error);
+    }
+    return *receiver.result;
+}
 
 #if 0
 
@@ -348,7 +410,9 @@ TEST_CASE("Initial draft", "[initial_draft]") {
 
     // std::this_thread::sleep_for(3s);
 
-    std::cout << await(std::move(a1)()) << "\n";
+    // std::cout << await(start(std::move(a1))) << "\n";
+
+    std::cout << sync_wait(std::move(a1)) << "\n";
 
     pre_exit();
 }
