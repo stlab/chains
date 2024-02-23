@@ -13,6 +13,8 @@
 #include <stlab/concurrency/await.hpp>
 #include <stlab/concurrency/future.hpp>
 
+#define STLAB_FWD(x) std::forward<decltype(x)>(x)
+
 /*
 
 If exception inside of a segment _apply_ function throws an exception then the exception must be
@@ -92,6 +94,16 @@ public:
     }
 };
 
+namespace detail {
+
+/// Apply a recursive lambda to each element in the tuple-like Segments.
+template <class Fold, class Segments>
+constexpr auto fold_over(Fold fold, Segments&& segments) {
+  return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); }, STLAB_FWD(segments));
+}
+
+} // namespace detail
+
 template <class Segment, class... Args>
 using segment_result_type =
     decltype(std::declval<Segment>().result_type_helper(std::declval<Args>()...));
@@ -100,32 +112,16 @@ using segment_result_type =
     simplify this code by handing the multi-argument case earlier (somehow).
 */
 
-#define STLAB_FWD(x) std::forward<decltype(x)>(x)
-
 template <class Tail, class Applicator, class... Fs>
 class chain {
     Tail _tail;
     segment<Applicator, Fs...> _head;
 
-    /// Apply a recursive lambda to each element in _tail, followed by _head.
-    template <class F>
-    auto fold_over(F fold) && {
-        return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); },
-                          std::tuple_cat(std::move(_tail), std::tuple(std::move(_head))));
-    }
-
-    template <class F>
-    static consteval auto static_fold_over(F fold) {
-        return std::apply([fold](auto&&... links) { return fold(fold, STLAB_FWD(links)...); },
-                          std::tuple_cat(std::declval<Tail>(),
-                                         std::tuple(std::declval<segment<Applicator, Fs...>>())));
-    }
-
     /// Return a lambda with the signature of
     /// head( tail<n>( tail<1>( tail<0>( auto&& args... ) ) ) )
     /// for computing the result type of this chain.
-    static consteval auto result_type_helper() {
-        return static_fold_over([](auto fold, auto&& first, auto&&... rest) {
+    static consteval auto result_type_helper(Tail&& tail, segment<Applicator, Fs...>&& head) {
+        return detail::fold_over([](auto fold, auto&& first, auto&&... rest) {
             if constexpr (sizeof...(rest) == 0) {
                 return [_segment = STLAB_FWD(first)](auto&&... args) mutable {
                     return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
@@ -136,12 +132,12 @@ class chain {
                     return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
                 };
             }
-        });
+        }, std::tuple_cat(std::move(tail), std::tuple{std::move(head)}));
     }
 
     template <class R>
     auto expand(const R& receiver) && {
-        return std::move(*this).fold_over([receiver](auto fold, auto&& first, auto&&... rest) {
+        return detail::fold_over([receiver](auto fold, auto&& first, auto&&... rest) {
             if constexpr (sizeof...(rest) == 0) {
                 return [receiver,
                         _segment = STLAB_FWD(first).append(receiver)](auto&&... args) mutable {
@@ -153,12 +149,13 @@ class chain {
                     return std::move(_segment).invoke(receiver, STLAB_FWD(args)...);
                 };
             }
-        });
+        }, std::tuple_cat(std::move(_tail), std::tuple{std::move(_head)}));
     }
 
 public:
     template <class... Args>
-    using result_type = decltype(result_type_helper()(std::declval<Args>()...));
+    using result_type = 
+      decltype(result_type_helper(std::declval<Tail>(), std::declval<segment<Applicator, Fs...>>())(std::declval<Args>()...));
 
     explicit chain(Tail&& tail, segment<Applicator, Fs...>&& head)
         : _tail{std::move(tail)}, _head{std::move(head)} {}
