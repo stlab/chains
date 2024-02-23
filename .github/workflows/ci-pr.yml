@@ -79,6 +79,7 @@ jobs:
           ninja: true
           vcpkg: false
           ccache: true
+          clangtidy: false
 
       - name: Configure CMake
         run: |
