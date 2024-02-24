@@ -55,6 +55,7 @@ public:
     segment(segment&&) noexcept = default;
     segment& operator=(const segment&) = default;
     segment& operator=(segment&&) noexcept = default;
+    ~segment() = default;
 
     template <class F>
     auto append(F&& f) && {

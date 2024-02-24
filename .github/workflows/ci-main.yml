@@ -1,10 +1,8 @@
-name: ci
+name: ci-main
 on:
-  pull_request:
   release:
     types: [published]
   push:
-    tags:
     branches:
       - main
       - develop
