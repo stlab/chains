@@ -25,18 +25,43 @@ set on the receiver.
 namespace chains::inline v1 {
 
 /*
+    An scheduler is a function that takes a function and a set of arguments and applies the
+   arguments to the function. The application may be scheduled in another context and the scheduler
+   may inject additional arguments into the function.
+*/
+
+template <class F>
+struct scheduler {
+    template <class... Args>
+    using result_type = std::invoke_result_t<F>;
+    F _f;
+    template <class... Args>
+    auto operator()(Args&&... args) const {
+        return std::invoke(_f, std::forward<Args>(args)...);
+    }
+};
+
+/*
 segment is invoked with a receiver -
 
 
 
 */
 
-template <class Applicator, class... Fs>
+template <class Injects = std::tuple<>, class Applicator, class... Fs>
 class segment {
     std::tuple<Fs...> _functions;
     Applicator _apply;
 
 public:
+    /*
+        An apply operation may inject additional arguments into the segment. The plan is that the
+        receiver will get sent to apply and this is how cancellation tokens can be injected into an
+        operation. Something like `with_cancellation`.
+
+        This feature is also used for the `then` operation where the resolve future is injected into
+        the segment.
+    */
     template <class... Args>
     auto result_type_helper(Args&&... args) && {
         return tuple_compose(std::move(_functions))(std::forward<Args>(args)...);
@@ -77,10 +102,11 @@ public:
     */
 
     template <class R, class... Args>
-    void invoke(const R& receiver, Args&&... args) && {
-        if (receiver.canceled()) return;
+    auto invoke(const R& receiver, Args&&... args) && {
+        // TODO: must handle this cancel prior to invoking the segment.
+        // if (receiver.canceled()) return;
 
-        std::move(_apply)(
+        return std::move(_apply)(
             [_f = tuple_compose(std::move(_functions)),
              _receiver = receiver](auto&&... args) mutable noexcept {
                 if (_receiver.canceled()) return;
@@ -104,6 +130,8 @@ constexpr auto fold_over(Fold fold, Segments&& segments) {
 }
 
 } // namespace detail
+
+#error "We need to account for the segment providing the argument to the tuple in the compose."
 
 template <class Segment, class... Args>
 using segment_result_type =
@@ -188,8 +216,9 @@ public:
     }
 
     template <class Receiver, class... Args>
-    void invoke(Receiver&& receiver, Args&&... args) && {
-        std::move(*this).expand(std::forward<Receiver>(receiver))(std::forward<Args>(args)...);
+    auto invoke(Receiver&& receiver, Args&&... args) && {
+        return std::move(*this).expand(std::forward<Receiver>(receiver))(
+            std::forward<Args>(args)...);
     }
 
     template <class... Args>
@@ -262,23 +291,27 @@ inline auto on(E&& executor) {
    holding the promise.
 */
 
-#if 0
 template <class F>
 inline auto then(F&& future) {
-    return segment{[_future = std::forward<F>(future)](auto&& f) {
-        return std::move(_future).then(std::forward<decltype(f)>(f));
-    }};
+    return chain{std::tuple<>{}, segment{[_future = std::forward<F>(future)](auto&& f) mutable {
+                     return std::move(_future).then(std::forward<decltype(f)>(f));
+                 }}};
 }
-#endif
 
 // TODO: (sean-parent) - should we make this pipeable?
+// TODO: (sean-parent) - fix case where invoke_t is void.
 
 template <class Chain, class... Args>
 inline auto start(Chain&& chain, Args&&... args) {
     using result_t = Chain::template result_type<Args...>;
+    using invoke_t = decltype(std::forward<Chain>(chain).invoke(
+        std::move(std::declval<stlab::packaged_task<result_t>>()), std::forward<Args>(args)...));
+    auto p = std::make_shared<std::optional<invoke_t>>();
     auto [receiver, future] =
-        stlab::package<result_t(result_t)>(stlab::immediate_executor, std::identity{});
-    std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
+        stlab::package<result_t(result_t)>(stlab::immediate_executor, [p](auto&& value) {
+            return std::forward<decltype(value)>(value);
+        });
+    *p = std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
     return std::move(future);
 }
 
@@ -326,8 +359,8 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
        that but for now create a receiver-ref.
     */
 
-    std::forward<Chain>(chain).invoke(receiver_ref<receiver_t>{&receiver},
-                                      std::forward<Args>(args)...);
+    auto hold = std::forward<Chain>(chain).invoke(receiver_ref<receiver_t>{&receiver},
+                                                  std::forward<Args>(args)...);
 
     std::unique_lock<std::mutex> lock(receiver.m);
     receiver.cv.wait(lock, [&] { return receiver.result.has_value() || receiver.error; });
@@ -346,17 +379,6 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
     wired into the chain. sync_wait needs to be able to invoke the promise/receiver - _then_ flag
     the condition that it is ready.
 */
-
-#if 0
-
-template <class F>
-inline auto then(F&& future) {
-    return segment{[_future = std::forward<F>(future)](auto&& f) {
-        return std::move(_future).then(std::forward<decltype(f)>(f));
-    }};
-}
-
-#endif
 
 } // namespace chains::inline v1
 
@@ -414,7 +436,10 @@ TEST_CASE("Initial draft", "[initial_draft]") {
 
     // std::cout << await(start(std::move(a1))) << "\n";
 
-    std::cout << sync_wait(std::move(a1)) << "\n";
+    auto future = start(std::move(a1));
+    auto a2 = then(future) | [](std::string s) { std::cout << s << "<-- \n"; };
+
+    std::cout << sync_wait(std::move(a2)) << "\n";
 
     pre_exit();
 }
