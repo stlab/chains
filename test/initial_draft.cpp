@@ -25,30 +25,27 @@ set on the receiver.
 namespace chains::inline v1 {
 
 /*
-    An scheduler is a function that takes a function and a set of arguments and applies the
-   arguments to the function. The application may be scheduled in another context and the scheduler
-   may inject additional arguments into the function.
-*/
-
-template <class F>
-struct scheduler {
-    template <class... Args>
-    using result_type = std::invoke_result_t<F>;
-    F _f;
-    template <class... Args>
-    auto operator()(Args&&... args) const {
-        return std::invoke(_f, std::forward<Args>(args)...);
-    }
-};
-
-/*
 segment is invoked with a receiver -
 
 
 
 */
 
-template <class Injects = std::tuple<>, class Applicator, class... Fs>
+template <class T>
+struct type {};
+
+template <class Injects, class Applicator, class... Fs>
+class segment;
+
+#if 0
+template <class Injects, class Applicator, class... Fs>
+inline auto make_segment(Applicator&& apply, Fs&&... fs) {
+    return segment<Injects, std::decay_t<Applicator>, std::decay_t<Fs>...>{
+        std::forward<Applicator>(apply), std::forward<Fs>(fs)...};
+}
+#endif
+
+template <class Injects, class Applicator, class... Fs>
 class segment {
     std::tuple<Fs...> _functions;
     Applicator _apply;
@@ -67,9 +64,9 @@ public:
         return tuple_compose(std::move(_functions))(std::forward<Args>(args)...);
     }
 
-    explicit segment(Applicator&& apply, std::tuple<Fs...>&& functions)
+    explicit segment(type<Injects>, Applicator&& apply, std::tuple<Fs...>&& functions)
         : _functions{std::move(functions)}, _apply{std::move(apply)} {}
-    explicit segment(Applicator&& apply, Fs&&... functions)
+    explicit segment(type<Injects>, Applicator&& apply, Fs&&... functions)
         : _functions{std::move(functions)...}, _apply{std::move(apply)} {}
 
     /*
@@ -83,8 +80,9 @@ public:
 
     template <class F>
     auto append(F&& f) && {
-        return chains::segment{std::move(_apply), std::tuple_cat(std::move(_functions),
-                                                                 std::tuple{std::forward<F>(f)})};
+        return chains::segment{
+            type<Injects>{}, std::move(_apply),
+            std::tuple_cat(std::move(_functions), std::tuple{std::forward<F>(f)})};
     }
 
 #if 0
@@ -131,25 +129,20 @@ constexpr auto fold_over(Fold fold, Segments&& segments) {
 
 } // namespace detail
 
-#error "We need to account for the segment providing the argument to the tuple in the compose."
-
-template <class Segment, class... Args>
-using segment_result_type =
-    decltype(std::declval<Segment>().result_type_helper(std::declval<Args>()...));
-
 /*
     simplify this code by handing the multi-argument case earlier (somehow).
 */
 
-template <class Tail, class Applicator, class... Fs>
+template <class Tail, class Injects, class Applicator, class... Fs>
 class chain {
     Tail _tail;
-    segment<Applicator, Fs...> _head;
+    segment<Injects, Applicator, Fs...> _head;
 
     /// Return a lambda with the signature of
     /// head( tail<n>( tail<1>( tail<0>( auto&& args... ) ) ) )
     /// for computing the result type of this chain.
-    static consteval auto result_type_helper(Tail&& tail, segment<Applicator, Fs...>&& head) {
+    static consteval auto result_type_helper(Tail&& tail,
+                                             segment<Injects, Applicator, Fs...>&& head) {
         return detail::fold_over(
             [](auto fold, auto&& first, auto&&... rest) {
                 if constexpr (sizeof...(rest) == 0) {
@@ -163,7 +156,7 @@ class chain {
                     };
                 }
             },
-            std::tuple_cat(std::move(tail), std::tuple{std::move(head)}));
+            std::tuple_cat(STLAB_FWD(tail), std::tuple{STLAB_FWD(head)}));
     }
 
     template <class R>
@@ -185,12 +178,27 @@ class chain {
             std::tuple_cat(std::move(_tail), std::tuple{std::move(_head)}));
     }
 
+    template <class... Args>
+    struct result_type_void_injects {
+        using type = decltype(result_type_helper(
+            std::declval<Tail>(),
+            std::declval<segment<Injects, Applicator, Fs...>>())(std::declval<Args>()...));
+    };
+
+    template <class... Args>
+    struct result_type_injects {
+        using type = decltype(result_type_helper(
+            std::declval<Tail>(), std::declval<segment<Injects, Applicator, Fs...>>())(
+            std::declval<Injects>(), std::declval<Args>()...));
+    };
+
 public:
     template <class... Args>
-    using result_type = decltype(result_type_helper(
-        std::declval<Tail>(), std::declval<segment<Applicator, Fs...>>())(std::declval<Args>()...));
+    using result_type = std::conditional_t<std::is_same_v<Injects, void>,
+                                           result_type_void_injects<Args...>,
+                                           result_type_injects<Args...>>::type;
 
-    explicit chain(Tail&& tail, segment<Applicator, Fs...>&& head)
+    explicit chain(Tail&& tail, segment<Injects, Applicator, Fs...>&& head)
         : _tail{std::move(tail)}, _head{std::move(head)} {}
 
     /*
@@ -209,8 +217,8 @@ public:
         return chains::chain{std::move(_tail), std::move(_head).append(std::forward<F>(f))};
     }
 
-    template <class I, class... Gs>
-    auto append(segment<I, Gs...>&& head) && {
+    template <class Jnjects, class I, class... Gs>
+    auto append(segment<Jnjects, I, Gs...>&& head) && {
         return chains::chain{std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))),
                              std::move(head)};
     }
@@ -221,6 +229,7 @@ public:
             std::forward<Args>(args)...);
     }
 
+#if 0
     template <class... Args>
     [[deprecated]] auto operator()(Args&&... args) && {
         using result_t = result_type<Args...>;
@@ -229,23 +238,25 @@ public:
         invoke(std::move(receiver), std::forward<Args>(args)...);
         return std::move(future);
     }
+#endif
 
     template <class F>
     friend auto operator|(chain&& c, F&& f) {
         return std::move(c).append(std::forward<F>(f));
     }
 
-    template <class I, class... Gs>
-    friend auto operator|(chain&& c, segment<I, Gs...>&& head) {
+    template <class Jnjects, class I, class... Gs>
+    friend auto operator|(chain&& c, segment<Jnjects, I, Gs...>&& head) {
         return std::move(c).append(std::move(head));
     }
 };
 
-template <class Tail, class Applicator, class... Fs>
-chain(Tail&& tail, segment<Applicator, Fs...>&& head) -> chain<Tail, Applicator, Fs...>;
+template <class Tail, class Injects, class Applicator, class... Fs>
+chain(Tail&& tail, segment<Injects, Applicator, Fs...>&& head)
+    -> chain<Tail, Injects, Applicator, Fs...>;
 
-template <class F, class Applicator, class... Fs>
-inline auto operator|(segment<Applicator, Fs...>&& head, F&& f) {
+template <class F, class Injects, class Applicator, class... Fs>
+inline auto operator|(segment<Injects, Applicator, Fs...>&& head, F&& f) {
     return chain{std::tuple<>{}, std::move(head).append(std::forward<F>(f))};
 }
 
@@ -266,22 +277,23 @@ last item in the chain as a segment.
 */
 template <class E>
 inline auto on(E&& executor) {
-    return segment{[_executor = std::forward<E>(executor)](auto&& f, auto&&... args) mutable {
-        std::move(_executor)(
-            [_f = std::forward<decltype(f)>(f),
-             _args = std::tuple{std::forward<decltype(args)>(args)...}]() mutable noexcept {
-                std::apply(std::move(_f), std::move(_args));
-            });
-        return std::monostate{};
-    }};
+    return segment{
+        type<void>{}, [_executor = std::forward<E>(executor)](auto&& f, auto&&... args) mutable {
+            std::move(_executor)(
+                [_f = std::forward<decltype(f)>(f),
+                 _args = std::tuple{std::forward<decltype(args)>(args)...}]() mutable noexcept {
+                    std::apply(std::move(_f), std::move(_args));
+                });
+            // return std::monostate{};
+        }};
 }
 
 /*
     The `then` algorithm takes a future and returns a segment (chain) that will schedule the
     segment as a continuation of the future.
 
-    The segment returns void so the future is (kind of) detached - but this should be done without
-   the overhead of a future::detach.
+    The segment returns void so the future is (kind of) detached - but this should be done
+   without the overhead of a future::detach.
 
     How is cancellation handled here? Let's say we have this:
 
@@ -293,9 +305,11 @@ inline auto on(E&& executor) {
 
 template <class F>
 inline auto then(F&& future) {
-    return chain{std::tuple<>{}, segment{[_future = std::forward<F>(future)](auto&& f) mutable {
-                     return std::move(_future).then(std::forward<decltype(f)>(f));
-                 }}};
+    return chain{std::tuple<>{},
+                 segment{type<typename std::decay_t<F>::result_type>{},
+                         [_future = std::forward<F>(future)](auto&& f) mutable {
+                             return std::move(_future).then(std::forward<decltype(f)>(f));
+                         }}};
 }
 
 // TODO: (sean-parent) - should we make this pipeable?
@@ -305,14 +319,23 @@ template <class Chain, class... Args>
 inline auto start(Chain&& chain, Args&&... args) {
     using result_t = Chain::template result_type<Args...>;
     using invoke_t = decltype(std::forward<Chain>(chain).invoke(
-        std::move(std::declval<stlab::packaged_task<result_t>>()), std::forward<Args>(args)...));
-    auto p = std::make_shared<std::optional<invoke_t>>();
-    auto [receiver, future] =
-        stlab::package<result_t(result_t)>(stlab::immediate_executor, [p](auto&& value) {
-            return std::forward<decltype(value)>(value);
-        });
-    *p = std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
-    return std::move(future);
+        std::declval<stlab::packaged_task<result_t>>(), std::forward<Args>(args)...));
+    if constexpr (std::is_same_v<invoke_t, void>) {
+        auto [receiver, future] =
+            stlab::package<result_t(result_t)>(stlab::immediate_executor, [](auto&& value) {
+                return std::forward<decltype(value)>(value);
+            });
+        std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
+        return std::move(future);
+    } else {
+        auto p = std::make_shared<std::optional<invoke_t>>();
+        auto [receiver, future] =
+            stlab::package<result_t(result_t)>(stlab::immediate_executor, [p](auto&& value) {
+                return std::forward<decltype(value)>(value);
+            });
+        *p = std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
+        return std::move(future);
+    }
 }
 
 template <class Receiver>
@@ -355,8 +378,8 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
     } receiver;
 
     /*
-        REVISIT: (sean-parent) - chain invoke doesn't work with std::ref(receiver). We should fix
-       that but for now create a receiver-ref.
+        REVISIT: (sean-parent) - chain invoke doesn't work with std::ref(receiver). We should
+       fix that but for now create a receiver-ref.
     */
 
     auto hold = std::forward<Chain>(chain).invoke(receiver_ref<receiver_t>{&receiver},
@@ -372,12 +395,13 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
 }
 
 /*
-    TODO: The ergonimics of chains are painful with three arguements. We could reduce to a single
-    argument or move to a concept? Here I really want the forward reference to be an rvalue ref.
+    TODO: The ergonimics of chains are painful with three arguements. We could reduce to a
+   single argument or move to a concept? Here I really want the forward reference to be an
+   rvalue ref.
 
-    The implementation of sync_wait is complicated by the fact that the promise is currently hard/
-    wired into the chain. sync_wait needs to be able to invoke the promise/receiver - _then_ flag
-    the condition that it is ready.
+    The implementation of sync_wait is complicated by the fact that the promise is currently
+   hard/ wired into the chain. sync_wait needs to be able to invoke the promise/receiver -
+   _then_ flag the condition that it is ready.
 */
 
 } // namespace chains::inline v1
@@ -398,6 +422,8 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         cout << "Hello from thread: " << std::this_thread::get_id() << "\n";
         return 42;
     };
+    // std::cout << typeid(decltype(a0)::result_type<>).name() << "\n";
+    //   auto future = start(std::move(a0));
 
     auto a1 = std::move(a0) | on(default_executor) | [](int x) {
         cout << "received: " << x << " on thread: " << std::this_thread::get_id() << "\n";
@@ -409,7 +435,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
     cout << "Ready to go async!\n";
 
 #if 0
-    auto a2 = then(std::move(a1)()) | [](std::string s){
+    auto a2 = then(std::move(a1)) | [](std::string s) {
         cout << s << "<-- \n";
         return 0;
     };
@@ -437,7 +463,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
     // std::cout << await(start(std::move(a1))) << "\n";
 
     auto future = start(std::move(a1));
-    auto a2 = then(future) | [](std::string s) { std::cout << s << "<-- \n"; };
+    auto a2 = then(future) | [](std::string s) { return s + "<-- \n"; };
 
     std::cout << sync_wait(std::move(a2)) << "\n";
 
