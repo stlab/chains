@@ -34,7 +34,7 @@ target_link_libraries(
   tests
   PRIVATE chains::chains_warnings
           chains::chains_options
-          chains::sample_library
+          chains::chains
           stlab::stlab
           Catch2::Catch2WithMain)
 

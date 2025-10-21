@@ -5,13 +5,14 @@
 
 #include <tuple>
 #include <utility>
-
+#include <functional>
 #include <exception>
 
 // temporary
 #include <any>
 #include <stlab/concurrency/await.hpp>
 #include <stlab/concurrency/future.hpp>
+#include <stlab/concurrency/immediate_executor.hpp>
 
 #define STLAB_FWD(x) std::forward<decltype(x)>(x)
 
