@@ -1,5 +1,5 @@
 include(cmake/SystemLink.cmake)
-include(cmake/LibFuzzer.cmake)
+# include(cmake/LibFuzzer.cmake)
 include(CMakeDependentOption)
 include(CheckCXXCompilerFlag)
 
@@ -78,14 +78,14 @@ macro(chains_setup_options)
       chains_ENABLE_CACHE)
   endif()
 
-  chains_check_libfuzzer_support(LIBFUZZER_SUPPORTED)
-  if(LIBFUZZER_SUPPORTED AND (chains_ENABLE_SANITIZER_ADDRESS OR chains_ENABLE_SANITIZER_THREAD OR chains_ENABLE_SANITIZER_UNDEFINED))
-    set(DEFAULT_FUZZER ON)
-  else()
-    set(DEFAULT_FUZZER OFF)
-  endif()
+  # chains_check_libfuzzer_support(LIBFUZZER_SUPPORTED)
+  # if(LIBFUZZER_SUPPORTED AND (chains_ENABLE_SANITIZER_ADDRESS OR chains_ENABLE_SANITIZER_THREAD OR chains_ENABLE_SANITIZER_UNDEFINED))
+  #   set(DEFAULT_FUZZER ON)
+  # else()
+  #   set(DEFAULT_FUZZER OFF)
+  # endif()
 
-  option(chains_BUILD_FUZZ_TESTS "Enable fuzz testing executable" ${DEFAULT_FUZZER})
+  # option(chains_BUILD_FUZZ_TESTS "Enable fuzz testing executable" ${DEFAULT_FUZZER})
 
 endmacro()
 
