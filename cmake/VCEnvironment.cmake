@@ -1,6 +1,6 @@
 include("${CMAKE_CURRENT_LIST_DIR}/Utilities.cmake")
 
-macro(detect_architecture)
+macro(chains_detect_architecture)
   # detect the architecture
   string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" CMAKE_SYSTEM_PROCESSOR_LOWER)
   if(CMAKE_SYSTEM_PROCESSOR_LOWER STREQUAL x86 OR CMAKE_SYSTEM_PROCESSOR_LOWER MATCHES "^i[3456]86$")
@@ -19,13 +19,13 @@ macro(detect_architecture)
       set(VCVARSALL_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
     else()
       set(VCVARSALL_ARCH x64)
-      message(STATUS "Unkown architecture CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR_LOWER} - using x64")
+      message(STATUS "Unknown architecture CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR_LOWER} - using x64")
     endif()
   endif()
 endmacro()
 
 # Run vcvarsall.bat and set CMake environment variables
-function(run_vcvarsall)
+function(chains_run_vcvarsall)
   # if MSVC but VSCMD_VER is not set, which means vcvarsall has not run
   if(MSVC AND "$ENV{VSCMD_VER}" STREQUAL "")
 
@@ -43,7 +43,7 @@ function(run_vcvarsall)
 
     if(EXISTS ${VCVARSALL_FILE})
       # detect the architecture
-      detect_architecture()
+      chains_detect_architecture()
 
       # run vcvarsall and print the environment variables
       message(STATUS "Running `${VCVARSALL_FILE} ${VCVARSALL_ARCH}` to set up the MSVC environment")

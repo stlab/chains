@@ -29,12 +29,12 @@ add_test(NAME cli.has_help COMMAND intro --help)
 add_test(NAME cli.version_matches COMMAND intro --version)
 set_tests_properties(cli.version_matches PROPERTIES PASS_REGULAR_EXPRESSION "${PROJECT_VERSION}")
 
-add_executable(tests tuple_tests.cpp initial_draft.cpp)
+add_executable(tests main.cpp tuple_tests.cpp initial_draft.cpp)
 target_link_libraries(
   tests
   PRIVATE chains::chains_warnings
           chains::chains_options
-          chains::sample_library
+          chains::chains
           stlab::stlab
           Catch2::Catch2WithMain)
 
