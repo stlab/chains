@@ -123,7 +123,7 @@ class chain {
     /// for computing the result type of this chain.
     static consteval auto result_type_helper(Tail&& tail, segment<Applicator, Fs...>&& head) {
         return detail::fold_over(
-            [](auto fold, auto&& first, auto&&... rest) {
+            []([[maybe_unused]] auto fold, auto&& first, auto&&... rest) {
                 if constexpr (sizeof...(rest) == 0) {
                     return [_segment = STLAB_FWD(first)](auto&&... args) mutable {
                         return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
@@ -141,7 +141,7 @@ class chain {
     template <class R>
     auto expand(const R& receiver) && {
         return detail::fold_over(
-            [receiver](auto fold, auto&& first, auto&&... rest) {
+            [receiver]([[maybe_unused]] auto fold, auto&& first, auto&&... rest) {
                 if constexpr (sizeof...(rest) == 0) {
                     return [receiver,
                             _segment = STLAB_FWD(first).append(receiver)](auto&&... args) mutable {

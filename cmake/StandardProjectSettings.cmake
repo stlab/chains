@@ -39,6 +39,10 @@ else()
   message(STATUS "No colored compiler diagnostic set for '${CMAKE_CXX_COMPILER_ID}' compiler.")
 endif()
 
+# Enable __cplusplus makro on MSVC which is disabled by default
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>)
+endif()
 
 # run vcvarsall when msvc is used
 include("${CMAKE_CURRENT_LIST_DIR}/VCEnvironment.cmake")
