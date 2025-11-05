@@ -30,16 +30,16 @@ TEST_CASE("Test tuple consume", "[tuple_consume]") {
         {
             auto func = [](int a, float b) { return a + static_cast<int>(b); };    
             auto result = chains::tuple_consume(t)(func);
-            REQUIRE((result == std::make_pair(3, std::make_tuple(3, 4.0f))));
+            REQUIRE((result == std::make_tuple(3, 3, 4.0f)));
         }
         THEN("it returns the correct result for a lambda with no parameters") {
             auto func = []() { return 42; };
             auto result = chains::tuple_consume(t)(func);
-            REQUIRE((result == std::make_pair(42, std::make_tuple(1, 2.0f, 3, 4.0f))));
+            REQUIRE((result == std::make_tuple(42, 1, 2.0f, 3, 4.0f)));
         }
         THEN("it returns the correct result for a callable with various call operators") {
             auto result = chains::tuple_consume(t)(multi_callable{});
-            REQUIRE((result == std::make_pair(6, std::make_tuple(4.0f))));
+            REQUIRE((result == std::make_tuple(6, 4.0f)));
         }
     }
 

@@ -131,11 +131,11 @@ auto tuple_consume(Tuple&& values) {
 
         if constexpr (consumed == 0) {
             // Remaining is original tuple (no elements consumed)
-            return std::pair{std::move(result), _values};
+            return std::tuple_cat(std::make_tuple(std::move(result)), _values);
         } else {
             auto remaining =
                 tuple_tail_at<tuple_t, consumed>(_values, std::make_index_sequence<N - consumed>{});
-            return std::pair{std::move(result), std::move(remaining)};
+            return std::tuple_cat(std::make_tuple(std::move(result)), std::move(remaining));
         }
     };
 }
