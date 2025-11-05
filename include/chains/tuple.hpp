@@ -39,7 +39,7 @@ auto operator|(tuple_pipeable<T>&& p, F& f) {
 
 /* Check if F is invocable with first K elements of tuple T */
 template <class F, class T, std::size_t... Is>
-constexpr bool invocable_with_prefix(std::index_sequence<Is...>) {
+constexpr auto invocable_with_prefix(std::index_sequence<Is...>) {
     return requires(F&& f, T& tup) { std::invoke(f, std::get<Is>(tup)...); };
 }
 
@@ -84,11 +84,6 @@ auto invoke_prefix(F&& f, Tuple& t) {
     }
 }
 
-/* Construct tuple tail starting at Offset (compile time) */
-template <class Tuple, std::size_t Offset, std::size_t... Is>
-auto tail_from(Tuple& t, std::index_sequence<Is...>) {
-    return std::tuple{std::get<Offset + Is>(t)...};
-}
 
 } // namespace detail
 
@@ -106,6 +101,14 @@ auto tuple_compose(std::tuple<Fs...>&& sequence) {
                              _sequence)
                              ._value);
     };
+}
+
+//--------------------------------------------------------------------------------------------------
+
+/* Construct tuple tail starting at Offset (compile time) */
+template <class Tuple, std::size_t Offset, std::size_t... Is>
+auto tuple_tail_at(Tuple& t, std::index_sequence<Is...>) {
+    return std::tuple{std::move(std::get<Offset + Is>(t))...};
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -131,7 +134,7 @@ auto tuple_consume(Tuple&& values) {
             return std::pair{std::move(result), _values};
         } else {
             auto remaining =
-                detail::tail_from<tuple_t, consumed>(_values, std::make_index_sequence<N - consumed>{});
+                tuple_tail_at<tuple_t, consumed>(_values, std::make_index_sequence<N - consumed>{});
             return std::pair{std::move(result), std::move(remaining)};
         }
     };

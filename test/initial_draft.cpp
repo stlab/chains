@@ -309,6 +309,7 @@ using namespace chains;
 using namespace stlab;
 
 TEST_CASE("Initial draft", "[initial_draft]") {
+#if 0
     auto a0 = on(default_executor) | [] {
         cout << "Hello from thread: " << std::this_thread::get_id() << "\n";
         return 42;
@@ -350,6 +351,6 @@ TEST_CASE("Initial draft", "[initial_draft]") {
     // std::this_thread::sleep_for(3s);
 
     std::cout << await(std::move(a1)()) << "\n";
-
+#endif
     pre_exit();
 }

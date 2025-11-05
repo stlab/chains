@@ -14,8 +14,8 @@ TEST_CASE("Test tuple compose", "[tuple_compose]") {
 }
 
 struct multi_callable {
-    int operator()(auto a, auto b) { return a + b; }
-    int operator()(auto a, auto b, auto c) { return static_cast<int>(a + b + c); }
+    int operator()(int a, float b) const { return a + static_cast<int>(b); }
+    int operator()(int a, float b, int c) const { return a + static_cast<int>(b) + c; }
 };
 
 struct void_t {};
