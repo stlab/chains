@@ -1,7 +1,9 @@
-#include <tuple>       // std::apply, std::forward_as_tuple, std::tuple
-#include <type_traits> // std::is_same_v
-#include <utility>     // std::forward, std::move
+#include <tuple>       // std::tuple, std::get, std::apply, std::tuple_size_v
+#include <type_traits> // std::is_same_v, std::decay_t, std::is_void_v
+#include <utility>     // std::forward, std::move, std::index_sequence, std::make_index_sequence
 #include <variant>     // std::monostate
+#include <functional>  // std::invoke
+#include <cstddef>     // std::size_t
 
 #ifndef CHAIN_TUPLE_HPP
 #define CHAIN_TUPLE_HPP
@@ -10,15 +12,12 @@ namespace chains::inline v0 {
 
 namespace detail {
 
-/*
-    Operators for fold expression for sequential execution. Simpler way?
-*/
-
+/* Map void return to std::monostate */
 template <class F>
 inline auto void_to_monostate(F& f) {
     return [&_f = f](auto&&... args) mutable {
-        if constexpr (std::is_same_v<decltype(std::move(_f)(std::forward<decltype(args)>(args)...)),
-                                     void>) {
+        if constexpr (std::is_same_v<
+                          decltype(std::move(_f)(std::forward<decltype(args)>(args)...)), void>) {
             std::move(_f)(std::forward<decltype(args)>(args)...);
             return std::monostate{};
         } else {
@@ -30,12 +29,65 @@ inline auto void_to_monostate(F& f) {
 template <class T>
 struct tuple_pipeable {
     T _value;
-    tuple_pipeable(T&& a) : _value{std::move(a)} {}
+    explicit tuple_pipeable(T&& a) : _value{std::move(a)} {}
 };
 
 template <class T, class F>
 auto operator|(tuple_pipeable<T>&& p, F& f) {
     return tuple_pipeable{void_to_monostate(f)(std::move(p._value))};
+}
+
+/* Check if F is invocable with first K elements of tuple T */
+template <class F, class T, std::size_t... Is>
+constexpr bool invocable_with_prefix(std::index_sequence<Is...>) {
+    return requires(F&& f, T& tup) { std::invoke(f, std::get<Is>(tup)...); };
+}
+
+/* Find largest prefix size (0..N) for which F is invocable */
+template <class F, class T, std::size_t N>
+struct find_max_prefix {
+    static constexpr std::size_t value =
+        invocable_with_prefix<F, T>(std::make_index_sequence<N>{})
+            ? N
+            : find_max_prefix<F, T, N - 1>::value;
+};
+
+template <class F, class T>
+struct find_max_prefix<F, T, 0> {
+    static constexpr std::size_t value = 0;
+};
+
+/* Invoke F with first K elements of tuple t (K known at compile time) */
+template <std::size_t K, class F, class Tuple>
+auto invoke_prefix(F&& f, Tuple& t) {
+    if constexpr (K == 0) {
+        // No arguments: only attempt if callable with ()
+        if constexpr (requires(F&& f2) { std::invoke(f2); }) {
+            if constexpr (std::is_void_v<decltype(std::invoke(f))>) {
+                std::invoke(f);
+                return std::monostate{};
+            } else {
+                return std::invoke(f);
+            }
+        } else {
+            return std::monostate{};
+        }
+    } else {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            if constexpr (std::is_void_v<decltype(std::invoke(f, std::get<Is>(t)...))>) {
+                std::invoke(f, std::get<Is>(t)...);
+                return std::monostate{};
+            } else {
+                return std::invoke(f, std::get<Is>(t)...);
+            }
+        }(std::make_index_sequence<K>{});
+    }
+}
+
+/* Construct tuple tail starting at Offset (compile time) */
+template <class Tuple, std::size_t Offset, std::size_t... Is>
+auto tail_from(Tuple& t, std::index_sequence<Is...>) {
+    return std::tuple{std::get<Offset + Is>(t)...};
 }
 
 } // namespace detail
@@ -53,6 +105,35 @@ auto tuple_compose(std::tuple<Fs...>&& sequence) {
                              },
                              _sequence)
                              ._value);
+    };
+}
+
+//--------------------------------------------------------------------------------------------------
+/*
+    tuple_consume:
+    Invokes the given callable with the largest invocable prefix of the stored tuple.
+    Returns pair<result, remaining_tuple>.
+    - If no prefix is invocable, result is std::monostate and remaining_tuple is the original tuple.
+    - If callable returns void, result is std::monostate.
+*/
+template <class Tuple>
+auto tuple_consume(Tuple&& values) {
+    return [_values = std::forward<Tuple>(values)](auto&& f) mutable {
+        using tuple_t = std::decay_t<Tuple>;
+        constexpr std::size_t N = std::tuple_size_v<tuple_t>;
+        using F_t = decltype(f);
+
+        constexpr std::size_t consumed = detail::find_max_prefix<F_t, tuple_t, N>::value;
+        auto result = detail::invoke_prefix<consumed>(std::forward<decltype(f)>(f), _values);
+
+        if constexpr (consumed == 0) {
+            // Remaining is original tuple (no elements consumed)
+            return std::pair{std::move(result), _values};
+        } else {
+            auto remaining =
+                detail::tail_from<tuple_t, consumed>(_values, std::make_index_sequence<N - consumed>{});
+            return std::pair{std::move(result), std::move(remaining)};
+        }
     };
 }
 
