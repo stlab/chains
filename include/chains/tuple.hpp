@@ -59,7 +59,7 @@ struct find_max_prefix<F, T, 0> {
 
 /* Invoke F with first K elements of tuple t (K known at compile time) */
 template <std::size_t K, class F, class Tuple>
-auto invoke_prefix(F&& f, Tuple& t) {
+constexpr auto invoke_prefix(F&& f, Tuple& t) {
     if constexpr (K == 0) {
         // No arguments: only attempt if callable with ()
         if constexpr (requires(F&& f2) { std::invoke(f2); }) {
@@ -107,7 +107,7 @@ auto tuple_compose(std::tuple<Fs...>&& sequence) {
 
 /* Construct tuple tail starting at Offset (compile time) */
 template <class Tuple, std::size_t Offset, std::size_t... Is>
-auto tuple_tail_at(Tuple& t, std::index_sequence<Is...>) {
+constexpr auto tuple_tail_at(Tuple& t, std::index_sequence<Is...>) {
     return std::tuple{std::move(std::get<Offset + Is>(t))...};
 }
 
@@ -120,7 +120,7 @@ auto tuple_tail_at(Tuple& t, std::index_sequence<Is...>) {
     - If callable returns void, result is std::monostate.
 */
 template <class Tuple>
-auto tuple_consume(Tuple&& values) {
+constexpr auto tuple_consume(Tuple&& values) {
     return [_values = std::forward<Tuple>(values)](auto&& f) mutable {
         using tuple_t = std::decay_t<Tuple>;
         constexpr std::size_t N = std::tuple_size_v<tuple_t>;
@@ -137,6 +137,31 @@ auto tuple_consume(Tuple&& values) {
                 tuple_tail_at<tuple_t, consumed>(_values, std::make_index_sequence<N - consumed>{});
             return std::tuple_cat(std::make_tuple(std::move(result)), std::move(remaining));
         }
+    };
+}
+
+template <size_t I>
+struct calculator {
+    template <typename F, typename T>
+    static constexpr auto apply(F& f, T t) {
+        if constexpr (I == std::tuple_size_v<F>) {
+            return std::get<0>(t);
+        } else {
+            return calculator<I + 1>::apply(f, chains::tuple_consume(std::move(t))(std::get<I>(f)));
+        }
+    }
+};
+
+template <typename F, typename... Args>
+constexpr auto calc(F f, Args&&... args) {
+    auto arguments = std::make_tuple(std::forward<Args>(args)...);
+    return calculator<0>::apply(f, arguments);
+}
+
+template <class... Fs>
+constexpr auto tuple_compose_greedy(std::tuple<Fs...>&& sequence) {
+    return [_sequence = std::move(sequence)](auto&&... args) mutable {
+        return calc(std::move(_sequence), std::forward<decltype(args)>(args)...);
     };
 }
 

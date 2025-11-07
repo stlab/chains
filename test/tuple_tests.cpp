@@ -42,6 +42,22 @@ TEST_CASE("Test tuple consume", "[tuple_consume]") {
             REQUIRE((result == std::make_tuple(6, 4.0f)));
         }
     }
-
 }
 
+
+TEST_CASE("Test concut functions", "[tuple_consume]") {
+
+    GIVEN("A tuple of mixed types")
+    {
+        auto oneInt2Int = [](int a) { return a * 2; };
+        auto twoInt2Int = [](int a, int b) { return a + b; };
+        auto void2Int = []() { return 42; };
+        auto functions = std::make_tuple(oneInt2Int, void2Int, twoInt2Int);
+
+        GIVEN("the calculation is done")
+        {
+            auto result = chains::calc(functions, 2);
+            REQUIRE(46 == result);
+        }
+    }
+}
