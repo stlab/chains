@@ -63,7 +63,7 @@ class segment {
 
 public:
     /*
-        An apply operation may inject additional arguments into the segment. The plan is that the
+            An apply operation may inject additional arguments into the segment. The plan is that the
         receiver will get sent to apply and this is how cancellation tokens can be injected into an
         operation. Something like `with_cancellation`.
 
@@ -171,22 +171,19 @@ class chain {
 
     template <class R>
     auto expand(R&& receiver) && {
-        using receiver_t = std::decay_t<R>;
-        auto shared_receiver = std::make_shared<receiver_t>(std::forward<R>(receiver));
-
         return detail::fold_over(
-            [shared_receiver]([[maybe_unused]] auto& fold, auto&& first,
+            [_receiver = std::forward<R>(receiver)]([[maybe_unused]] auto fold, auto&& first,
                                                     auto&&... rest) mutable {
                 if constexpr (sizeof...(rest) == 0) {
-                    return [shared_receiver, _segment = STLAB_FWD(first).append(shared_receiver)](
-                               auto&&... args) mutable {
-                        return std::move(_segment).invoke(shared_receiver, STLAB_FWD(args)...);
+                    return [_receiver, _segment = STLAB_FWD(first).append([_receiver](auto&& val) {
+                        _receiver->operator()(std::forward<decltype(val)>(val));
+                    })](auto&&... args) mutable {
+                        return std::move(_segment).invoke(_receiver, STLAB_FWD(args)...);
                     };
                 } else {
-                    return [shared_receiver,
-                            _segment = STLAB_FWD(first).append(
-                                          fold(fold, STLAB_FWD(rest)...))](auto&&... args) mutable {
-                        return std::move(_segment).invoke(shared_receiver, STLAB_FWD(args)...);
+                    return [_receiver, _segment = STLAB_FWD(first).append(fold(
+                                           fold, STLAB_FWD(rest)...))](auto&&... args) mutable {
+                        return std::move(_segment).invoke(_receiver, STLAB_FWD(args)...);
                     };
                 }
             },
@@ -332,26 +329,34 @@ inline auto then(F&& future) {
 
 template <class Chain, class... Args>
 inline auto start(Chain&& chain, Args&&... args) {
-    using result_t = Chain::template result_type<Args...>;
-    using invoke_t = decltype(std::forward<Chain>(chain).invoke(
-        std::declval<stlab::packaged_task<result_t>>(), std::forward<Args>(args)...));
+    using result_t = typename Chain::template result_type<Args...>;
 
-    if constexpr (std::is_same_v<invoke_t, void>) {
-        auto [receiver, future] =
-            stlab::package<result_t(result_t)>(stlab::immediate_executor, [](auto&& value) {
-                return std::forward<decltype(value)>(value);
-            });
-        std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
-        return std::move(future);
+    using package_task_t = decltype(stlab::package<result_t(result_t)>(
+                                        stlab::immediate_executor,
+                                        [](auto&& v) { return std::forward<decltype(v)>(v); }).first);
+
+    auto shared = std::shared_ptr<package_task_t>();
+
+    // Build the receiver and future first.
+    auto [receiver, future] = stlab::package<result_t(result_t)>(
+        stlab::immediate_executor, [_shared = shared](auto&& v) { return std::forward<decltype(v)>(v); });
+
+    // Promote receiver to shared_ptr to extend lifetime beyond this scope.
+    shared = std::make_shared<package_task_t>(std::move(receiver));
+
+    // Recompute invoke_t based on passing the shared_ptr (pointer semantics).
+    using invoke_t =
+        decltype(std::forward<Chain>(chain).invoke(shared, std::forward<Args>(args)...));
+
+    if constexpr (std::is_void_v<invoke_t>) {
+        // Just invoke; lifetime of receiver is now owned by captures inside the async chain.
+        std::forward<Chain>(chain).invoke(shared, std::forward<Args>(args)...);
     } else {
-        auto p = std::make_shared<std::optional<invoke_t>>();
-        auto [receiver, future] =
-            stlab::package<result_t(result_t)>(stlab::immediate_executor, [p](auto&& value) {
-                return std::forward<decltype(value)>(value);
-            });
-        *p = std::forward<Chain>(chain).invoke(std::move(receiver), std::forward<Args>(args)...);
-        return std::move(future);
+        // Keep any handle the chain returns (e.g. continuation future or cancellation handle).
+        auto hold = std::forward<Chain>(chain).invoke(shared, std::forward<Args>(args)...);
+        (void)hold; // store or return if you later need it
     }
+    return std::move(future);
 }
 
 
@@ -402,7 +407,7 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
 }
 
 /*
-    TODO: The ergonimics of chains are painful with three arguements. We could reduce to a
+    TODO: The ergonomics of chains are painful with three arguments. We could reduce to a
    single argument or move to a concept? Here I really want the forward reference to be an
    rvalue ref.
 
@@ -426,6 +431,75 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
 using namespace std;
 using namespace chains;
 using namespace stlab;
+
+// Cancellation example
+
+struct cancellation_source {
+    struct state {
+        std::atomic_bool canceled{false};
+    };
+    std::shared_ptr<state> _s = std::make_shared<state>();
+    void cancel() const { _s->canceled.store(true, std::memory_order_relaxed); }
+};
+
+struct cancellation_token {
+    std::shared_ptr<cancellation_source::state> _s;
+    bool canceled() const { return _s->canceled.load(std::memory_order_relaxed); }
+};
+
+// Segment that injects a cancellation_token (Injects != void)
+inline auto with_cancellation(cancellation_source src) {
+    return chains::segment{chains::type<cancellation_token>{},
+                           [_src = std::move(src)](auto&& f, auto&&... args) mutable {
+                               // Create token and forward it as first argument
+                               cancellation_token tok{_src._s};
+                               std::forward<decltype(f)>(f)(tok,
+                                                            std::forward<decltype(args)>(args)...);
+                           }};
+}
+
+// executor variant that also injects the token and schedules asynchronously
+template <class E>
+auto on_with_cancellation(E&& executor, cancellation_source source) {
+    return chains::segment{
+        chains::type<cancellation_token>{},
+        [_executor = std::forward<E>(executor), _source = std::move(source)](auto&& f,
+                                                                       auto&&... args) mutable {
+            cancellation_token token{_source._s};
+            std::move(_executor)(
+                [_f = std::forward<decltype(f)>(f), _token = token,
+                 _args = std::tuple{std::forward<decltype(args)>(args)...}]() mutable noexcept {
+                    std::apply(
+                        [&_f, &_token](auto&&... as) {
+                            std::forward<decltype(_f)>(_f)(_token, std::forward<decltype(as)>(as)...);
+                        },
+                        std::move(_args));
+                });
+        }};
+}
+
+TEST_CASE("Cancellation injection", "[initial_draft]") {
+    cancellation_source src;
+
+    // Build a chain where each function expects the token as first argument.
+    // First function uses the token, returns an int.
+    auto c = with_cancellation(src) | [](cancellation_token token, int x) {
+        if (token.canceled()) return 0;
+        return x * 2;
+    } | [](int y) { return y + 10; }; // token only needed by first step
+
+    auto f = start(std::move(c), 5);
+    REQUIRE(f.get_ready() == 20); // (5*2)+10
+
+    // Demonstrate cancel before start
+    src.cancel();
+    auto c2 = with_cancellation(src) | [](cancellation_token token, int x) {
+        if (token.canceled()) return 0;
+        return x * 3;
+    };
+    auto f2 = start(std::move(c2), 7);
+    REQUIRE(f2.get_ready() == 0);
+}
 
 TEST_CASE("Initial draft", "[initial_draft]") {
 
