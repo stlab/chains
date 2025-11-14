@@ -45,7 +45,7 @@ TEST_CASE("Test tuple consume", "[tuple_consume]") {
 }
 
 
-TEST_CASE("Test concut functions", "[tuple_consume]") {
+TEST_CASE("Test concat functions", "[tuple_consume]") {
 
     GIVEN("A tuple of mixed types")
     {
