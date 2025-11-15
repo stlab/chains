@@ -596,6 +596,79 @@ auto split(Chain&& c) {
     return split_holder<Chain>{std::forward<Chain>(c)};
 }
 
+template <class Upstream, class... BoundArgs>
+struct split_holder_bound {
+    using upstream_result_t = typename Upstream::template result_type<BoundArgs...>;
+
+    std::shared_ptr<Upstream> _upstream;
+    std::tuple<std::decay_t<BoundArgs>...> _bound_args;
+    std::shared_ptr<split_state<upstream_result_t>> _state;
+    std::once_flag _start_once;
+
+    explicit split_holder_bound(Upstream&& u, BoundArgs&&... args)
+        : _upstream(std::make_shared<Upstream>(std::move(u))),
+          _bound_args(std::forward<BoundArgs>(args)...),
+          _state(std::make_shared<split_state<upstream_result_t>>()) {}
+
+private:
+    template <class F>
+    auto make_branch(F&& f) {
+        // Segment injects upstream_result_t so result_type<> with () sees correct type.
+        auto branch_segment = segment{
+            type<upstream_result_t>{},
+            [this]<typename Composed>(Composed&& composed) mutable {
+                // Register branch continuation (called after upstream completes)
+                _state->add_continuation(
+                    [comp = std::forward<Composed>(composed)](const upstream_result_t& v) mutable {
+                        try {
+                            comp(v);
+                        } catch (...) { /* optional branch error handling */
+                        }
+                    });
+
+                // Start upstream only once
+                if (!_state->_started.exchange(true, std::memory_order_acq_rel)) {
+                    struct upstream_receiver {
+                        std::shared_ptr<split_state<upstream_result_t>> _s;
+                        void operator()(upstream_result_t&& val) { _s->set_value(std::move(val)); }
+                        void set_exception(std::exception_ptr p) { _s->set_exception(p); }
+                        bool canceled() const { return false; }
+                    };
+                    auto receiver = std::make_shared<upstream_receiver>();
+                    receiver->_s = _state;
+
+                    // Invoke upstream with bound arguments (no external start args)
+                    std::apply(
+                        [this, &receiver](auto&... args) {
+                            std::move(*_upstream).invoke(receiver, args...);
+                        },
+                        _bound_args);
+                }
+            },
+            std::forward<F>(f) // branch function (receives upstream_result_t injected as first arg)
+        };
+
+        return chain{std::tuple<>{}, std::move(branch_segment)};
+    }
+
+public:
+    template <class F>
+    auto fan(F&& f) & {
+        return make_branch(std::forward<F>(f));
+    }
+    template <class F>
+    auto fan(F&& f) && {
+        return make_branch(std::forward<F>(f));
+    }
+};
+
+// Helper to build a bound split holder
+template <class Chain, class... Args>
+auto split_bind(Chain&& c, Args&&... args) {
+    return split_holder_bound<std::decay_t<Chain>, std::decay_t<Args>...>{
+        std::forward<Chain>(c), std::forward<Args>(args)...};
+}
+
 TEST_CASE("Cancellation injection", "[initial_draft]") {
     {
         cancellation_source src;
@@ -643,6 +716,23 @@ TEST_CASE("Split fan-out", "[initial_draft]") {
 
     auto f_right = start(std::move(right), 10);
     auto f_left = start(std::move(left), 5);
+    REQUIRE(f_right.get_ready() == std::string("v=15"));
+    REQUIRE(f_left.get_ready() == 31);
+}
+
+TEST_CASE("Split fan-out bound", "[initial_draft]") {
+    auto base = on(immediate_executor) | [](int a) { return a; } | [](int x) { return x + 5; };
+
+    // Bind upstream start argument 10 once:
+    auto splitter = split_bind(std::move(base), 10);
+
+    // Branches now start with no args; upstream result (15) is injected.
+    auto left = splitter.fan([](int v) { return v * 2; }) | [](int x) { return x + 1; };
+    auto right = splitter.fan([](int v) { return std::string("v=") + std::to_string(v); });
+
+    auto f_right = start(std::move(right)); // no argument
+    auto f_left = start(std::move(left));   // no argument
+
     REQUIRE(f_right.get_ready() == std::string("v=15"));
     REQUIRE(f_left.get_ready() == 31);
 }
