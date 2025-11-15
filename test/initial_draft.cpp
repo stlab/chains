@@ -418,6 +418,7 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
 #include <iostream>
 #include <stlab/concurrency/await.hpp>
 #include <stlab/concurrency/default_executor.hpp>
+#include <stlab/test/model.hpp>
 #include <thread>
 
 using namespace std;
@@ -469,6 +470,7 @@ auto on_with_cancellation(E&& executor, cancellation_source source) {
         }};
 }
 
+
 TEST_CASE("Cancellation injection", "[initial_draft]") {
     {
         cancellation_source src;
@@ -491,6 +493,7 @@ TEST_CASE("Cancellation injection", "[initial_draft]") {
         auto f2 = start(std::move(c2), 7);
         REQUIRE(f2.get_ready() == 0);
     }
+
     //{
     //    cancellation_source src;
 
@@ -519,6 +522,21 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         auto val = f.get_ready();
         REQUIRE(46 == val);
     }
+
+    GIVEN("a sequence of callables that just work with move only value") {
+        auto oneInt2Int = [](move_only a) { return move_only(a.member() * 2); };
+        auto twoInt2Int = [](move_only a, move_only b) { return move_only(a.member() + b.member()); };
+        auto void2Int = []() { return move_only(42); };
+
+        auto a0 = on(stlab::immediate_executor) | oneInt2Int | void2Int | twoInt2Int;
+
+        auto f = start(std::move(a0), move_only(2));
+        REQUIRE(f.is_ready());
+        auto val = std::move(f).get_ready();
+        REQUIRE(46 == val.member());
+    }
+
+
 #if 0
     auto a0 = on(default_executor) | [] {
         cout << "Hello from thread: " << std::this_thread::get_id() << "\n";
@@ -569,5 +587,5 @@ TEST_CASE("Initial draft", "[initial_draft]") {
 
     // std::cout << sync_wait(std::move(a2)) << "\n";
 
-    pre_exit();
+    //pre_exit();
 }

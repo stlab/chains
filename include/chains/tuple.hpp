@@ -40,7 +40,7 @@ auto operator|(tuple_pipeable<T>&& p, F& f) {
 /* Check if F is invocable with first K elements of tuple T */
 template <class F, class T, std::size_t... Is>
 constexpr auto invocable_with_prefix(std::index_sequence<Is...>) {
-    return requires(F&& f, T& tup) { std::invoke(f, std::get<Is>(tup)...); };
+    return requires(F&& f, T&& tup) { std::invoke(f, std::move(std::get<Is>(tup))...); };
 }
 
 /* Find largest prefix size (0..N) for which F is invocable */
@@ -59,7 +59,7 @@ struct find_max_prefix<F, T, 0> {
 
 /* Invoke F with first K elements of tuple t (K known at compile time) */
 template <std::size_t K, class F, class Tuple>
-constexpr auto invoke_prefix(F&& f, Tuple& t) {
+constexpr auto invoke_prefix(F&& f, Tuple&& t) {
     if constexpr (K == 0) {
         // No arguments: only attempt if callable with ()
         if constexpr (requires(F&& f2) { std::invoke(f2); }) {
@@ -74,11 +74,11 @@ constexpr auto invoke_prefix(F&& f, Tuple& t) {
         }
     } else {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            if constexpr (std::is_void_v<decltype(std::invoke(f, std::get<Is>(t)...))>) {
-                std::invoke(f, std::get<Is>(t)...);
+            if constexpr (std::is_void_v<decltype(std::invoke(f, std::move(std::get<Is>(t))...))>) {
+                std::invoke(f, std::move(std::get<Is>(t))...);
                 return std::monostate{};
             } else {
-                return std::invoke(f, std::get<Is>(t)...);
+                return std::invoke(f, std::move(std::get<Is>(t))...);
             }
         }(std::make_index_sequence<K>{});
     }
@@ -107,7 +107,7 @@ auto tuple_compose(std::tuple<Fs...>&& sequence) {
 
 /* Construct tuple tail starting at Offset (compile time) */
 template <class Tuple, std::size_t Offset, std::size_t... Is>
-constexpr auto tuple_tail_at(Tuple& t, std::index_sequence<Is...>) {
+constexpr auto tuple_tail_at(Tuple&& t, std::index_sequence<Is...>) {
     return std::tuple{std::move(std::get<Offset + Is>(t))...};
 }
 
@@ -131,10 +131,10 @@ constexpr auto tuple_consume(Tuple&& values) {
 
         if constexpr (consumed == 0) {
             // Remaining is original tuple (no elements consumed)
-            return std::tuple_cat(std::make_tuple(std::move(result)), _values);
+            return std::tuple_cat(std::make_tuple(std::move(result)), std::move(_values));
         } else {
             auto remaining =
-                tuple_tail_at<tuple_t, consumed>(_values, std::make_index_sequence<N - consumed>{});
+                tuple_tail_at<tuple_t, consumed>(std::move(_values), std::make_index_sequence<N - consumed>{});
             return std::tuple_cat(std::make_tuple(std::move(result)), std::move(remaining));
         }
     };
@@ -143,7 +143,7 @@ constexpr auto tuple_consume(Tuple&& values) {
 template<std::size_t I, typename F, typename T>
 constexpr auto calc_step(F& f, T t) {
     if constexpr (I == std::tuple_size_v<F>) {
-        return std::get<0>(t);
+        return std::get<0>(std::move(t));
     } else {
         auto&& fn = std::get<I>(f);
         auto next = chains::tuple_consume(std::move(t))(fn);
