@@ -140,23 +140,24 @@ constexpr auto tuple_consume(Tuple&& values) {
     };
 }
 
-template <size_t I>
-struct calculator {
-    template <typename F, typename T>
-    static constexpr auto apply(F& f, T t) {
-        if constexpr (I == std::tuple_size_v<F>) {
-            return std::get<0>(t);
-        } else {
-            return calculator<I + 1>::apply(f, chains::tuple_consume(std::move(t))(std::get<I>(f)));
-        }
+template<std::size_t I, typename F, typename T>
+constexpr auto calc_step(F& f, T t) {
+    if constexpr (I == std::tuple_size_v<F>) {
+        return std::get<0>(t);
+    } else {
+        auto&& fn = std::get<I>(f);
+        auto next = chains::tuple_consume(std::move(t))(fn);
+        return calc_step<I + 1>(f, std::move(next));
     }
-};
+}
 
 template <typename F, typename... Args>
 constexpr auto calc(F f, Args&&... args) {
-    auto arguments = std::make_tuple(std::forward<Args>(args)...);
-    return calculator<0>::apply(f, arguments);
+    return calc_step<0>(
+        f, std::make_tuple(std::forward<Args>(args)...)
+    );
 }
+
 
 template <class... Fs>
 constexpr auto tuple_compose_greedy(std::tuple<Fs...>&& sequence) {

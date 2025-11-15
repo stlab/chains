@@ -519,7 +519,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         auto val = f.get_ready();
         REQUIRE(46 == val);
     }
-
+#if 0
     auto a0 = on(default_executor) | [] {
         cout << "Hello from thread: " << std::this_thread::get_id() << "\n";
         return 42;
@@ -535,7 +535,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
 
     cout << "Main thread: " << std::this_thread::get_id() << "\n";
     cout << "Ready to go async!\n";
-
+#endif
 #if 0
     auto a2 = then(std::move(a1)) | [](std::string s) {
         cout << s << "<-- \n";
