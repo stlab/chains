@@ -332,10 +332,9 @@ auto start(Chain&& chain, Args&&... args) {
     auto shared = std::shared_ptr<package_task_t>();
 
     // Build the receiver and future first.
-    auto [receiver, future] =
-        stlab::package<result_t(result_t)>(stlab::immediate_executor, [_shared = shared]<typename T>(T&& val) {
-            return std::forward<T>(val);
-        });
+    auto [receiver, future] = stlab::package<result_t(result_t)>(
+        stlab::immediate_executor,
+        [_shared = shared]<typename T>(T&& val) { return std::forward<T>(val); });
 
     // Promote receiver to shared_ptr to extend lifetime beyond this scope.
     shared = std::make_shared<package_task_t>(std::move(receiver));
@@ -442,12 +441,13 @@ struct cancellation_token {
 
 // Segment that injects a cancellation_token (Injects != void)
 inline auto with_cancellation(cancellation_source src) {
-    return chains::segment{chains::type<cancellation_token>{},
-                           [_src = std::move(src)]<typename F, typename...Args>(F&& f, Args&&... args) mutable {
-                               // Create token and forward it as first argument
-                               cancellation_token token{_src._state};
-                               std::forward<F>(f)(token, std::forward<Args>(args)...);
-                           }};
+    return chains::segment{
+        chains::type<cancellation_token>{},
+        [_src = std::move(src)]<typename F, typename... Args>(F&& f, Args&&... args) mutable {
+            // Create token and forward it as first argument
+            cancellation_token token{_src._state};
+            std::forward<F>(f)(token, std::forward<Args>(args)...);
+        }};
 }
 
 // executor variant that also injects the token and schedules asynchronously
@@ -470,6 +470,131 @@ auto on_with_cancellation(E&& executor, cancellation_source source) {
         }};
 }
 
+template <class T>
+    requires std::is_copy_constructible_v<T>
+struct split_state {
+    std::mutex _m;
+    std::condition_variable _cv;
+    std::optional<T> _value;
+    std::exception_ptr _error{nullptr};
+    std::vector<std::function<void(const T&)>> _continuations;
+    std::atomic_bool _started{false};
+    std::atomic_bool _completed{false};
+
+    void set_value(T v) {
+        if (_completed.load(std::memory_order_acquire)) return;
+        {
+            std::lock_guard lk(_m);
+            _value.emplace(std::move(v));
+            _completed.store(true, std::memory_order_release);
+        }
+        auto continuations = extract_continuations();
+        for (auto& c : continuations)
+            c(*_value);
+        _cv.notify_all();
+    }
+
+    void set_exception(std::exception_ptr p) {
+        {
+            std::lock_guard lk(_m);
+            _error = p;
+            _completed.store(true, std::memory_order_release);
+        }
+        // auto continuations = extract_continuations();
+        // for (auto& c : continuations) {
+        //     // We skip invoking branch continuations on exception; if needed they can be
+        //     // generalized to receive exception too.
+        // }
+        _cv.notify_all();
+    }
+
+    void add_continuation(std::function<void(const T&)> fn) {
+        std::unique_lock lk(_m);
+        if (_completed.load(std::memory_order_acquire) && _value) {
+            auto v = *_value; // copy out
+            lk.unlock();
+            fn(v);
+            return;
+        }
+        _continuations.push_back(std::move(fn));
+    }
+
+private:
+    std::vector<std::function<void(const T&)>> extract_continuations() {
+        std::vector<std::function<void(const T&)>> tmp;
+        std::swap(tmp, _continuations);
+        return tmp;
+    }
+};
+
+template <class Upstream>
+struct split_holder {
+    std::shared_ptr<Upstream> _upstream;
+    std::shared_ptr<void> _state;
+    std::once_flag _init_once;
+
+    explicit split_holder(Upstream&& u) : _upstream(std::make_shared<Upstream>(std::move(u))) {}
+
+private:
+    template <class F>
+    auto make_branch(F&& f) {
+        using upstream_t = Upstream;
+
+        auto branch_segment = segment{
+            type<void>{},
+            [this]<typename Composed, typename... StartArgs>(Composed&& composed,
+                                                             StartArgs&&... start_args) mutable {
+                using result_t = typename upstream_t::template result_type<StartArgs...>;
+
+                // Allocate shared state only once (first branch start)
+                std::call_once(_init_once,
+                               [this] { _state = std::make_shared<split_state<result_t>>(); });
+
+                auto state = std::static_pointer_cast<split_state<result_t>>(_state);
+
+                // Register this branch's continuation
+                state->add_continuation(
+                    [comp = std::forward<Composed>(composed)](const result_t& v) mutable noexcept {
+                        try {
+                            comp(v);
+                        } catch (...) { /* optional: log */
+                        }
+                    });
+
+                // Start upstream only once
+                if (!state->_started.exchange(true, std::memory_order_acq_rel)) {
+                    struct upstream_receiver {
+                        std::shared_ptr<split_state<result_t>> _s;
+                        void operator()(result_t&& val) { _s->set_value(std::move(val)); }
+                        void set_exception(std::exception_ptr p) { _s->set_exception(p); }
+                        bool canceled() const { return false; }
+                    };
+                    auto receiver = std::make_shared<upstream_receiver>();
+                    receiver->_s = state;
+                    // Move upstream here, because chain wants an rvalue and we only start once.
+                    std::move(*_upstream).invoke(receiver, std::forward<StartArgs>(start_args)...);
+                }
+            },
+            std::forward<F>(f)};
+
+        return chain{std::tuple<>{}, std::move(branch_segment)};
+    }
+
+public:
+    template <class F>
+    auto fan(F&& f) & {
+        return make_branch(std::forward<F>(f));
+    }
+    template <class F>
+    auto fan(F&& f) && {
+        return make_branch(std::forward<F>(f));
+    }
+};
+
+template <class Chain>
+auto split(Chain&& c) {
+    return split_holder<Chain>{std::forward<Chain>(c)};
+}
 
 TEST_CASE("Cancellation injection", "[initial_draft]") {
     {
@@ -509,6 +634,19 @@ TEST_CASE("Cancellation injection", "[initial_draft]") {
     //}
 }
 
+// --- Example test demonstrating split ---------------------------------------------------------
+TEST_CASE("Split fan-out", "[initial_draft]") {
+    auto base = on(immediate_executor) | [](int a) { return a; } | [](int x) { return x + 5; };
+    auto splitter = split(std::move(base));
+    auto left = splitter.fan([](int v) { return v * 2; }) | [](int x) { return x + 1; };
+    auto right = splitter.fan([](int v) { return std::string("v=") + std::to_string(v); });
+
+    auto f_right = start(std::move(right), 10);
+    auto f_left = start(std::move(left), 5);
+    REQUIRE(f_right.get_ready() == std::string("v=15"));
+    REQUIRE(f_left.get_ready() == 31);
+}
+
 TEST_CASE("Initial draft", "[initial_draft]") {
     GIVEN("a sequence of callables with different arguments") {
         auto oneInt2Int = [](int a) { return a * 2; };
@@ -525,7 +663,9 @@ TEST_CASE("Initial draft", "[initial_draft]") {
 
     GIVEN("a sequence of callables that just work with move only value") {
         auto oneInt2Int = [](move_only a) { return move_only(a.member() * 2); };
-        auto twoInt2Int = [](move_only a, move_only b) { return move_only(a.member() + b.member()); };
+        auto twoInt2Int = [](move_only a, move_only b) {
+            return move_only(a.member() + b.member());
+        };
         auto void2Int = []() { return move_only(42); };
 
         auto a0 = on(stlab::immediate_executor) | oneInt2Int | void2Int | twoInt2Int;
@@ -535,7 +675,6 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         auto val = std::move(f).get_ready();
         REQUIRE(46 == val.member());
     }
-
 
 #if 0
     auto a0 = on(default_executor) | [] {
@@ -587,5 +726,5 @@ TEST_CASE("Initial draft", "[initial_draft]") {
 
     // std::cout << sync_wait(std::move(a2)) << "\n";
 
-    //pre_exit();
+    // pre_exit();
 }

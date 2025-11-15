@@ -140,10 +140,17 @@ constexpr auto tuple_consume(Tuple&& values) {
     };
 }
 
-template<std::size_t I, typename F, typename T>
+template <std::size_t I, typename F, typename T>
 constexpr auto calc_step(F& f, T t) {
     if constexpr (I == std::tuple_size_v<F>) {
-        return std::get<0>(std::move(t));
+        // Base case: we finished applying all functions.
+        // If there are no remaining tuple elements, return std::monostate
+        // (mirrors void -> monostate mapping elsewhere).
+        if constexpr (std::tuple_size_v<T> == 0) {
+            return std::monostate{};
+        } else {
+            return std::get<0>(std::move(t));
+        }
     } else {
         auto&& fn = std::get<I>(f);
         auto next = chains::tuple_consume(std::move(t))(fn);
