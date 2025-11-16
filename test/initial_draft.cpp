@@ -3,13 +3,12 @@
 
 #include <chains/tuple.hpp>
 
-#include <tuple>
-#include <utility>
-
-#include <exception>
-
 #include <stlab/concurrency/await.hpp>
 #include <stlab/concurrency/future.hpp>
+
+#include <exception>
+#include <tuple>
+#include <utility>
 
 #define STLAB_FWD(x) std::forward<decltype(x)>(x)
 
@@ -78,7 +77,7 @@ public:
         The basic operations should follow those from C++ lambdas, for now default everything.
         and see if the compiler gets it correct.
     */
-    explicit segment(const segment&) = default;
+    segment(const segment&) = default;
     segment(segment&&) noexcept = default;
     segment& operator=(const segment&) = default;
     segment& operator=(segment&&) noexcept = default;
@@ -127,8 +126,11 @@ namespace detail {
 /// Apply a recursive lambda to each element in the tuple-like Segments.
 template <class Fold, class Segments>
 constexpr auto fold_over(Fold fold, Segments&& segments) {
-    return std::apply([fold](auto&&... links) mutable { return fold(fold, STLAB_FWD(links)...); },
-                      STLAB_FWD(segments));
+    return std::apply(
+        [fold]<typename... Links>(Links&&... links) mutable {
+            return fold(fold, std::forward<Links>(links)...);
+        },
+        STLAB_FWD(segments));
 }
 
 } // namespace detail
@@ -148,36 +150,39 @@ class chain {
     static consteval auto result_type_helper(Tail&& tail,
                                              segment<Injects, Applicator, Fs...>&& head) {
         return detail::fold_over(
-            []([[maybe_unused]] auto fold, auto&& first, auto&&... rest) {
+            []<typename Fold, typename First, typename... Rest>([[maybe_unused]] Fold fold,
+                                                                First&& first, Rest&&... rest) {
                 if constexpr (sizeof...(rest) == 0) {
-                    return [_segment = STLAB_FWD(first)](auto&&... args) mutable {
-                        return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
+                    return [_segment = std::forward<First>(first)]<typename... Args>(
+                               Args&&... args) mutable {
+                        return std::move(_segment).result_type_helper(std::forward<Args>(args)...);
                     };
                 } else {
-                    return [_segment = STLAB_FWD(first).append(fold(fold, STLAB_FWD(rest)...))](
-                               auto&&... args) mutable {
-                        return std::move(_segment).result_type_helper(STLAB_FWD(args)...);
+                    return [_segment = std::forward<First>(first).append(
+                                fold(fold, std::forward<Rest>(rest)...))]<typename... Args>(
+                               Args&&... args) mutable {
+                        return std::move(_segment).result_type_helper(std::forward<Args>(args)...);
                     };
                 }
             },
-            std::tuple_cat(STLAB_FWD(tail), std::tuple{STLAB_FWD(head)}));
+            std::tuple_cat(std::move(tail), std::tuple{std::move(head)}));
     }
 
     template <class R>
     auto expand(R&& receiver) && {
-        return detail::fold_over(
-            [_receiver = std::forward<R>(receiver)]([[maybe_unused]] auto fold, auto&& first,
-                                                    auto&&... rest) mutable {
+        return detail::fold_over([_receiver = std::forward<R>(receiver)]
+            <typename Fold, typename First, typename... Rest>([[maybe_unused]] Fold fold, First&& first,
+                                                    Rest&&... rest) mutable {
                 if constexpr (sizeof...(rest) == 0) {
                     return [_receiver,
-                            _segment = STLAB_FWD(first).append([_receiver]<typename V>(V&& val) {
+                            _segment = std::forward<First>(first).append([_receiver]<typename V>(V&& val) {
                                 _receiver->operator()(std::forward<V>(val));
                             })]<typename... T>(T&&... args) mutable {
                         return std::move(_segment).invoke(_receiver, std::forward<T>(args)...);
                     };
                 } else {
-                    return [_receiver, _segment = STLAB_FWD(first).append(
-                                           fold(fold, STLAB_FWD(rest)...))]<typename... T>(
+                    return [_receiver, _segment = std::forward<First>(first).append(
+                                           fold(fold, std::forward<Rest>(rest)...))]<typename... T>(
                                T&&... args) mutable {
                         return std::move(_segment).invoke(_receiver, std::forward<T>(args)...);
                     };
@@ -214,7 +219,7 @@ public:
         and see if the compiler gets it correct.
     */
 
-    explicit chain(const chain&) = default;
+    chain(const chain&) = default;
     chain(chain&&) noexcept = default;
     chain& operator=(const chain&) = default;
     chain& operator=(chain&&) noexcept = default;
@@ -355,7 +360,7 @@ auto start(Chain&& chain, Args&&... args) {
 }
 
 template <class Chain, class... Args>
-inline auto sync_wait(Chain&& chain, Args&&... args) {
+auto sync_wait(Chain&& chain, Args&&... args) {
     using result_t = typename Chain::template result_type<Args...>;
 
     struct receiver_t {
@@ -381,23 +386,24 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
         }
 
         bool canceled() const { return false; }
-    } receiver;
+    };
 
     /*
        REVISIT: (sean-parent) - chain invoke doesn't work with std::ref(receiver). We should
        fix that but for now create a receiver-ref.
     */
 
-    auto hold = std::forward<Chain>(chain).invoke(receiver_ref<receiver_t>{&receiver},
-                                                  std::forward<Args>(args)...);
+    auto receiver = std::make_shared<receiver_t>();
 
-    std::unique_lock<std::mutex> lock(receiver.m);
-    receiver.cv.wait(lock, [&] { return receiver.result.has_value() || receiver.error; });
+    std::forward<Chain>(chain).invoke(receiver, std::forward<Args>(args)...);
 
-    if (receiver.error) {
-        std::rethrow_exception(receiver.error);
+    std::unique_lock<std::mutex> lock(receiver->m);
+    receiver->cv.wait(lock, [&] { return receiver->result.has_value() || receiver->error; });
+
+    if (receiver->error) {
+        std::rethrow_exception(receiver->error);
     }
-    return *receiver.result;
+    return *receiver->result;
 }
 
 /*
@@ -415,7 +421,6 @@ inline auto sync_wait(Chain&& chain, Args&&... args) {
 //--------------------------------------------------------------------------------------------------
 
 #include <iostream>
-#include <stlab/concurrency/await.hpp>
 #include <stlab/concurrency/default_executor.hpp>
 #include <stlab/test/model.hpp>
 #include <thread>
@@ -436,7 +441,7 @@ struct cancellation_source {
 
 struct cancellation_token {
     std::shared_ptr<cancellation_source::state> _state;
-    bool canceled() const { return _state->canceled.load(std::memory_order_relaxed); }
+    auto canceled() const { return _state->canceled.load(std::memory_order_relaxed); }
 };
 
 // Segment that injects a cancellation_token (Injects != void)
@@ -766,55 +771,20 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         REQUIRE(46 == val.member());
     }
 
-#if 0
-    auto a0 = on(default_executor) | [] {
-        cout << "Hello from thread: " << std::this_thread::get_id() << "\n";
-        return 42;
-    };
-    // std::cout << typeid(decltype(a0)::result_type<>).name() << "\n";
-    //   auto future = start(std::move(a0));
+    GIVEN("a sequence of callables in a chain of chains synchronous") {
+        auto a0 = on(immediate_executor) | [](int x) { return x * 2; } | on(immediate_executor) | [](int x) { return to_string(x); } |
+            on(immediate_executor) | [](const string& s) { return s + "!"; };
 
-    auto a1 = std::move(a0) | on(default_executor) | [](int x) {
-        cout << "received: " << x << " on thread: " << std::this_thread::get_id() << "\n";
-        // throw std::runtime_error("test-exception");
-        return "forwarding: " + std::to_string(x + 1);
-    };
-
-    cout << "Main thread: " << std::this_thread::get_id() << "\n";
-    cout << "Ready to go async!\n";
-#endif
-#if 0
-    auto a2 = then(std::move(a1)) | [](std::string s) {
-        cout << s << "<-- \n";
-        return 0;
-    };
-#endif
-
-#if 0
-    {
-    auto f = std::move(a1)(); // start and cancel.
-    std::this_thread::sleep_for(1ns);
+        auto f = start(std::move(a0), 42);
+        auto val = f.get_ready();
+        REQUIRE(val == string("84!"));
     }
-#endif
 
-#if 0
-    // TODO: (sean-parent) await on a chain can be optimized.
+    GIVEN("a sequence of callables in a chain of chains asynchronous") {
+        auto a0 = on(default_executor) | [](int x) { return x * 2; } | on(immediate_executor) | [](int x) { return to_string(x); } |
+            on(default_executor) | [](const string& s) { return s + "!"; };
 
-    try {
-        std::cout << any_cast<std::string>(await(std::move(a1)())) << "\n";
-    } catch(const std::exception& error) {
-        std::cout << "exception: " << error.what() << "\n";
+        auto val = sync_wait(std::move(a0), 42);
+        REQUIRE(val == string("84!"));
     }
-#endif
-
-    // std::this_thread::sleep_for(3s);
-
-    // std::cout << await(start(std::move(a1))) << "\n";
-
-    // auto future = start(std::move(a1));
-    // auto a2 = then(future) | [](std::string s) { return s + "<-- \n"; };
-
-    // std::cout << sync_wait(std::move(a2)) << "\n";
-
-    // pre_exit();
 }

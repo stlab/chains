@@ -1,9 +1,9 @@
+#include <cstddef>     // std::size_t
+#include <functional>  // std::invoke
 #include <tuple>       // std::tuple, std::get, std::apply, std::tuple_size_v
 #include <type_traits> // std::is_same_v, std::decay_t, std::is_void_v
 #include <utility>     // std::forward, std::move, std::index_sequence, std::make_index_sequence
 #include <variant>     // std::monostate
-#include <functional>  // std::invoke
-#include <cstddef>     // std::size_t
 
 #ifndef CHAIN_TUPLE_HPP
 #define CHAIN_TUPLE_HPP
@@ -14,14 +14,13 @@ namespace detail {
 
 /* Map void return to std::monostate */
 template <class F>
-inline auto void_to_monostate(F& f) {
-    return [&_f = f](auto&&... args) mutable {
-        if constexpr (std::is_same_v<
-                          decltype(std::move(_f)(std::forward<decltype(args)>(args)...)), void>) {
-            std::move(_f)(std::forward<decltype(args)>(args)...);
+auto void_to_monostate(F& f) {
+    return [&_f = f]<typename... Args>(Args&&... args) mutable {
+        if constexpr (std::is_same_v<decltype(std::move(_f)(std::forward<Args>(args)...)), void>) {
+            std::move(_f)(std::forward<Args>(args)...);
             return std::monostate{};
         } else {
-            return std::move(_f)(std::forward<decltype(args)>(args)...);
+            return std::move(_f)(std::forward<Args>(args)...);
         }
     };
 }
@@ -47,9 +46,9 @@ constexpr auto invocable_with_prefix(std::index_sequence<Is...>) {
 template <class F, class T, std::size_t N>
 struct find_max_prefix {
     static constexpr std::size_t value =
-        invocable_with_prefix<F, T>(std::make_index_sequence<N>{})
-            ? N
-            : find_max_prefix<F, T, N - 1>::value;
+        invocable_with_prefix<F, T>(std::make_index_sequence<N>{}) ?
+            N :
+            find_max_prefix<F, T, N - 1>::value;
 };
 
 template <class F, class T>
@@ -84,15 +83,14 @@ constexpr auto invoke_prefix(F&& f, Tuple&& t) {
     }
 }
 
-
 } // namespace detail
 
 //--------------------------------------------------------------------------------------------------
 template <class... Fs>
 auto tuple_compose(std::tuple<Fs...>&& sequence) {
-    return [_sequence = std::move(sequence)](auto&&... args) mutable {
+    return [_sequence = std::move(sequence)]<typename... Args>(Args&&... args) mutable {
         return std::move(std::apply(
-                             [_args = std::forward_as_tuple(std::forward<decltype(args)>(args)...)](
+                             [_args = std::forward_as_tuple(std::forward<Args>(args)...)](
                                  auto& first, auto&... functions) mutable {
                                  return (
                                      detail::tuple_pipeable{std::apply(first, std::move(_args))} |
@@ -121,20 +119,19 @@ constexpr auto tuple_tail_at(Tuple&& t, std::index_sequence<Is...>) {
 */
 template <class Tuple>
 constexpr auto tuple_consume(Tuple&& values) {
-    return [_values = std::forward<Tuple>(values)](auto&& f) mutable {
+    return [_values = std::forward<Tuple>(values)]<typename F>(F&& f) mutable {
         using tuple_t = std::decay_t<Tuple>;
         constexpr std::size_t N = std::tuple_size_v<tuple_t>;
-        using F_t = decltype(f);
 
-        constexpr std::size_t consumed = detail::find_max_prefix<F_t, tuple_t, N>::value;
-        auto result = detail::invoke_prefix<consumed>(std::forward<decltype(f)>(f), _values);
+        constexpr std::size_t consumed = detail::find_max_prefix<F, tuple_t, N>::value;
+        auto result = detail::invoke_prefix<consumed>(std::forward<F>(f), _values);
 
         if constexpr (consumed == 0) {
             // Remaining is original tuple (no elements consumed)
             return std::tuple_cat(std::make_tuple(std::move(result)), std::move(_values));
         } else {
-            auto remaining =
-                tuple_tail_at<tuple_t, consumed>(std::move(_values), std::make_index_sequence<N - consumed>{});
+            auto remaining = tuple_tail_at<tuple_t, consumed>(
+                std::move(_values), std::make_index_sequence<N - consumed>{});
             return std::tuple_cat(std::make_tuple(std::move(result)), std::move(remaining));
         }
     };
@@ -160,16 +157,13 @@ constexpr auto calc_step(F& f, T t) {
 
 template <typename F, typename... Args>
 constexpr auto calc(F f, Args&&... args) {
-    return calc_step<0>(
-        f, std::make_tuple(std::forward<Args>(args)...)
-    );
+    return calc_step<0>(f, std::make_tuple(std::forward<Args>(args)...));
 }
-
 
 template <class... Fs>
 constexpr auto tuple_compose_greedy(std::tuple<Fs...>&& sequence) {
-    return [_sequence = std::move(sequence)](auto&&... args) mutable {
-        return calc(std::move(_sequence), std::forward<decltype(args)>(args)...);
+    return [_sequence = std::move(sequence)]<typename... Args>(Args&&... args) mutable {
+        return calc(std::move(_sequence), std::forward<Args>(args)...);
     };
 }
 
