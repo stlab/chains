@@ -1,12 +1,12 @@
+#ifndef CHAIN_TUPLE_HPP
+#define CHAIN_TUPLE_HPP
+
 #include <cstddef>     // std::size_t
 #include <functional>  // std::invoke
 #include <tuple>       // std::tuple, std::get, std::apply, std::tuple_size_v
 #include <type_traits> // std::is_same_v, std::decay_t, std::is_void_v
 #include <utility>     // std::forward, std::move, std::index_sequence, std::make_index_sequence
 #include <variant>     // std::monostate
-
-#ifndef CHAIN_TUPLE_HPP
-#define CHAIN_TUPLE_HPP
 
 namespace chains::inline v0 {
 
@@ -60,7 +60,6 @@ struct find_max_prefix<F, T, 0> {
 template <std::size_t K, class F, class Tuple>
 constexpr auto invoke_prefix(F&& f, Tuple&& t) {
     if constexpr (K == 0) {
-        // No arguments: only attempt if callable with ()
         if constexpr (requires(F&& f2) { std::invoke(f2); }) {
             if constexpr (std::is_void_v<decltype(std::invoke(f))>) {
                 std::invoke(f);
