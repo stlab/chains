@@ -127,11 +127,11 @@ constexpr auto tuple_consume(Tuple&& values) {
 
         if constexpr (consumed == 0) {
             // Remaining is original tuple (no elements consumed)
-            return std::tuple_cat(std::make_tuple(std::move(result)), std::move(_values));
+            return std::tuple_cat(std::tuple{std::move(result)}, std::move(_values));
         } else {
             auto remaining = tuple_tail_at<tuple_t, consumed>(
                 std::move(_values), std::make_index_sequence<N - consumed>{});
-            return std::tuple_cat(std::make_tuple(std::move(result)), std::move(remaining));
+            return std::tuple_cat(std::tuple{std::move(result)}, std::move(remaining));
         }
     };
 }
@@ -156,7 +156,7 @@ constexpr auto calc_step(F& f, T t) {
 
 template <typename F, typename... Args>
 constexpr auto calc(F f, Args&&... args) {
-    return calc_step<0>(f, std::make_tuple(std::forward<Args>(args)...));
+    return calc_step<0>(f, std::tuple{std::forward<Args>(args)...});
 }
 
 template <class... Fs>

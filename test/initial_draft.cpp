@@ -77,7 +77,7 @@ public:
         The basic operations should follow those from C++ lambdas, for now default everything.
         and see if the compiler gets it correct.
     */
-    segment(const segment&) = default;
+    explicit segment(const segment&) = default;
     segment(segment&&) noexcept = default;
     segment& operator=(const segment&) = default;
     segment& operator=(segment&&) noexcept = default;
@@ -86,7 +86,7 @@ public:
     auto append(F&& f) && {
         return chains::segment{
             type<Injects>{}, std::move(_apply),
-            std::tuple_cat(std::move(_functions), std::make_tuple(std::forward<F>(f)))};
+            std::tuple_cat(std::move(_functions), std::tuple{std::forward<F>(f)})};
     }
 
 #if 0
@@ -177,14 +177,14 @@ class chain {
                     return [_receiver,
                             _segment = std::forward<First>(first).append([_receiver]<typename V>(V&& val) {
                                 _receiver->operator()(std::forward<V>(val));
-                            })]<typename... T>(T&&... args) mutable {
-                        return std::move(_segment).invoke(_receiver, std::forward<T>(args)...);
+                            })]<typename... Args>(Args&&... args) mutable {
+                        return std::move(_segment).invoke(_receiver, std::forward<Args>(args)...);
                     };
                 } else {
                     return [_receiver, _segment = std::forward<First>(first).append(
-                                           fold(fold, std::forward<Rest>(rest)...))]<typename... T>(
-                               T&&... args) mutable {
-                        return std::move(_segment).invoke(_receiver, std::forward<T>(args)...);
+                                           fold(fold, std::forward<Rest>(rest)...))]<typename... Args>(
+                               Args&&... args) mutable {
+                        return std::move(_segment).invoke(_receiver, std::forward<Args>(args)...);
                     };
                 }
             },
@@ -232,7 +232,7 @@ public:
 
     template <class Jnjects, class I, class... Gs>
     auto append(segment<Jnjects, I, Gs...>&& head) && {
-        return chains::chain{std::tuple_cat(std::move(_tail), std::make_tuple(std::move(_head))),
+        return chains::chain{std::tuple_cat(std::move(_tail), std::tuple{std::move(_head)}),
                              std::move(head)};
     }
 
@@ -314,15 +314,15 @@ auto on(E&& executor) {
     `auto f = start(then(future));`
 
     And we destruct f. We need to _delete_ the (detached) future. Where is this held? f is only
-   holding the promise.
+    holding the promise.
 */
 
 template <class F>
 auto then(F&& future) {
     return chain{std::tuple<>{},
                  segment{type<typename std::decay_t<F>::result_type>{},
-                         [_future = std::forward<F>(future)](auto&& f) mutable {
-                             return std::move(_future).then(std::forward<decltype(f)>(f));
+                         [_future = std::forward<F>(future)]<typename C>(C&& continuation) mutable {
+                             return std::move(_future).then(std::forward<C>(continuation));
                          }}};
 }
 
@@ -330,34 +330,41 @@ auto then(F&& future) {
 // TODO: (sean-parent) - fix case where invoke_t is void.
 
 template <class Chain, class... Args>
-auto start(Chain&& chain, Args&&... args) {
-    using result_t = typename Chain::template result_type<Args...>;
-
+inline auto start(Chain&& chain, Args&&... args) {
+    using result_t = Chain::template result_type<Args...>;
     using package_task_t = stlab::packaged_task<result_t>;
-    auto shared = std::shared_ptr<package_task_t>();
 
-    // Build the receiver and future first.
-    auto [receiver, future] = stlab::package<result_t(result_t)>(
-        stlab::immediate_executor,
-        [_shared = shared]<typename T>(T&& val) { return std::forward<T>(val); });
+    using invoke_t = decltype(std::forward<Chain>(chain).invoke(
+        std::declval<std::shared_ptr<stlab::packaged_task<result_t>>>(),
+        std::forward<Args>(args)...));
 
-    // Promote receiver to shared_ptr to extend lifetime beyond this scope.
-    shared = std::make_shared<package_task_t>(std::move(receiver));
+    auto shared_receiver = std::shared_ptr<package_task_t>();
 
-    // Recompute invoke_t based on passing the shared_ptr (pointer semantics).
-    using invoke_t =
-        decltype(std::forward<Chain>(chain).invoke(shared, std::forward<Args>(args)...));
+    if constexpr (std::is_same_v<invoke_t, void>) {
+        auto [receiver, future] = stlab::package<result_t(result_t)>(
+            stlab::immediate_executor, []<typename T>(T&& val) { return std::forward<T>(val); });
 
-    if constexpr (std::is_void_v<invoke_t>) {
-        // Just invoke; lifetime of receiver is now owned by captures inside the async chain.
-        std::forward<Chain>(chain).invoke(shared, std::forward<Args>(args)...);
+        // Promote receiver to shared_ptr to extend lifetime beyond this scope and circumvent the
+        // move only capabilities of package_task.
+        shared_receiver = std::make_shared<package_task_t>(std::move(receiver));
+
+        std::forward<Chain>(chain).invoke(std::move(shared_receiver), std::forward<Args>(args)...);
+
+        return std::move(future);
     } else {
-        // Keep any handle the chain returns (e.g. continuation future or cancellation handle).
-        auto hold = std::forward<Chain>(chain).invoke(shared, std::forward<Args>(args)...);
-        (void)hold; // store or return if you later need it
+        auto p = std::make_shared<std::optional<invoke_t>>();
+        auto [receiver, future] = stlab::package<result_t(result_t)>(
+            stlab::immediate_executor,
+            [p]<typename V>(V&& value) { return std::forward<V>(value); });
+
+        shared_receiver = std::make_shared<package_task_t>(std::move(receiver));
+
+        *p = std::forward<Chain>(chain).invoke(std::move(shared_receiver),
+                                               std::forward<Args>(args)...);
+        return std::move(future);
     }
-    return std::move(future);
 }
+
 
 template <class Chain, class... Args>
 auto sync_wait(Chain&& chain, Args&&... args) {
@@ -465,7 +472,7 @@ auto on_with_cancellation(E&& executor, cancellation_source source) {
             cancellation_token token{_source._state};
             std::move(_executor)(
                 [_f = std::forward<F>(f), _token = token,
-                 _args = std::make_tuple(std::forward<Args>(args)...)]() mutable noexcept {
+                 _args = std::tuple{std::forward<Args>(args)...}]() mutable noexcept {
                     std::apply(
                         [&_f, &_token]<typename... As>(As&&... as) {
                             std::forward<decltype(_f)>(_f)(_token, std::forward<As>(as)...);
@@ -787,4 +794,20 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         auto val = sync_wait(std::move(a0), 42);
         REQUIRE(val == string("84!"));
     }
+}
+
+
+TEST_CASE("Cancellation of then()", "[initial_draft]") {
+    annotate_counters cnt;
+    GIVEN("that a ") {
+        auto fut = async(default_executor, [] {
+            std::this_thread::sleep_for(std::chrono::seconds{3});
+            std::cout << "Future did run" << std::endl;
+            return std::string("42");
+        }).then([_counter = annotate{cnt}](const auto& s) { std::cout << s << std::endl; });
+
+        auto result_f = start(then(fut));
+    }
+    std::this_thread::sleep_for(std::chrono::seconds{5});
+    std::cout << cnt << std::endl;
 }
