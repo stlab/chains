@@ -69,6 +69,7 @@ target_include_directories(stlab INTERFACE
 # configure files based on CMake configuration options
 add_subdirectory(configured_files)
 
+add_subdirectory(include/chains)
 # Adding the src:
 add_subdirectory(src)
 

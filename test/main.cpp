@@ -4,7 +4,7 @@
 
 #include <stlab/pre_exit.hpp>
 
-int main(int argc, char** argv) {
+auto main(int argc, char** argv) -> int {
     int result = Catch::Session().run(argc, argv);
 
     stlab::pre_exit();

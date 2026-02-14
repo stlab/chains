@@ -1,6 +1,8 @@
 #ifndef CHAIN_TUPLE_HPP
 #define CHAIN_TUPLE_HPP
 
+#include <chains/config.hpp>
+
 #include <cstddef>     // std::size_t
 #include <functional>  // std::invoke
 #include <tuple>       // std::tuple, std::get, std::apply, std::tuple_size_v
@@ -8,7 +10,7 @@
 #include <utility>     // std::forward, std::move, std::index_sequence, std::make_index_sequence
 #include <variant>     // std::monostate
 
-namespace chains::inline v0 {
+namespace chains::inline CHAINS_VERSION_NAMESPACE() {
 
 namespace detail {
 
@@ -42,7 +44,7 @@ constexpr auto invocable_with_prefix(std::index_sequence<Is...>) {
     return requires(F&& f, T&& tup) { std::invoke(f, std::move(std::get<Is>(tup))...); };
 }
 
-/* Find largest prefix size (0..N) for which F is invocable */
+/* Find the largest prefix size (0..N) for which F is invocable */
 template <class F, class T, std::size_t N>
 struct find_max_prefix {
     static constexpr std::size_t value =
@@ -136,6 +138,7 @@ constexpr auto tuple_consume(Tuple&& values) {
     };
 }
 
+namespace detail {
 template <std::size_t I, typename F, typename T>
 constexpr auto calc_step(F& f, T t) {
     if constexpr (I == std::tuple_size_v<F>) {
@@ -158,17 +161,18 @@ template <typename F, typename... Args>
 constexpr auto calc(F f, Args&&... args) {
     return calc_step<0>(f, std::tuple{std::forward<Args>(args)...});
 }
+} // namespace detail
 
 template <class... Fs>
 constexpr auto tuple_compose_greedy(std::tuple<Fs...>&& sequence) {
     return [_sequence = std::move(sequence)]<typename... Args>(Args&&... args) mutable {
-        return calc(std::move(_sequence), std::forward<Args>(args)...);
+        return detail::calc(std::move(_sequence), std::forward<Args>(args)...);
     };
 }
 
 //--------------------------------------------------------------------------------------------------
 
-} // namespace chains::inline v0
+} // namespace chains::inline CHAINS_VERSION_NAMESPACE()
 
 //--------------------------------------------------------------------------------------------------
 
