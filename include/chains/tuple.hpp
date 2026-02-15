@@ -1,3 +1,9 @@
+/*
+Copyright 2026 Adobe
+  Distributed under the Boost Software License, Version 1.0.
+  (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+*/
+
 #ifndef CHAIN_TUPLE_HPP
 #define CHAIN_TUPLE_HPP
 
@@ -11,6 +17,8 @@
 #include <variant>     // std::monostate
 
 namespace chains::inline CHAINS_VERSION_NAMESPACE() {
+
+//--------------------------------------------------------------------------------------------------
 
 namespace detail {
 
@@ -43,6 +51,8 @@ template <class F, class T, std::size_t... Is>
 constexpr auto invocable_with_prefix(std::index_sequence<Is...>) {
     return requires(F&& f, T&& tup) { std::invoke(f, std::move(std::get<Is>(tup))...); };
 }
+
+//--------------------------------------------------------------------------------------------------
 
 /* Find the largest prefix size (0..N) for which F is invocable */
 template <class F, class T, std::size_t N>
@@ -87,6 +97,7 @@ constexpr auto invoke_prefix(F&& f, Tuple&& t) {
 } // namespace detail
 
 //--------------------------------------------------------------------------------------------------
+
 template <class... Fs>
 auto tuple_compose(std::tuple<Fs...>&& sequence) {
     return [_sequence = std::move(sequence)]<typename... Args>(Args&&... args) mutable {
@@ -111,13 +122,13 @@ constexpr auto tuple_tail_at(Tuple&& t, std::index_sequence<Is...>) {
 }
 
 //--------------------------------------------------------------------------------------------------
-/*
-    tuple_consume:
-    Invokes the given callable with the largest invocable prefix of the stored tuple.
-    Returns pair<result, remaining_tuple>.
-    - If no prefix is invocable, result is std::monostate and remaining_tuple is the original tuple.
-    - If callable returns void, result is std::monostate.
-*/
+/**
+ *  tuple_consume:
+ *  Invokes the given callable with the largest invocable prefix of the stored tuple.
+ *  Returns pair<result, remaining_tuple>.
+ *  - If no prefix is invocable, result is std::monostate and remaining_tuple is the original tuple.
+ *  - If callable returns void, result is std::monostate.
+ */
 template <class Tuple>
 constexpr auto tuple_consume(Tuple&& values) {
     return [_values = std::forward<Tuple>(values)]<typename F>(F&& f) mutable {
@@ -138,9 +149,11 @@ constexpr auto tuple_consume(Tuple&& values) {
     };
 }
 
+//--------------------------------------------------------------------------------------------------
+
 namespace detail {
 template <std::size_t I, typename F, typename T>
-constexpr auto calc_step(F& f, T t) {
+constexpr auto interpret_impl_step(F& f, T t) {
     if constexpr (I == std::tuple_size_v<F>) {
         // Base case: we finished applying all functions.
         // If there are no remaining tuple elements, return std::monostate
@@ -158,19 +171,43 @@ constexpr auto calc_step(F& f, T t) {
 }
 
 template <typename F, typename... Args>
-constexpr auto calc(F f, Args&&... args) {
-    return calc_step<0>(f, std::tuple{std::forward<Args>(args)...});
+constexpr auto interpret_impl(F f, Args&&... args) {
+    return interpret_impl_step<0>(f, std::tuple{std::forward<Args>(args)...});
 }
 } // namespace detail
 
+//--------------------------------------------------------------------------------------------------
+
+/**
+ * This function returns a callable object that works in a Forth like manner on all given arguments.
+ * Interim results and not needed initial arguments will be pushed on an internal stack and popped
+ * while evaluating the next function.
+ * No allocations are made during the calculation, because the stack is evaluated at compile time.
+ * The callable objects can have 0..n arguments and may even return void.
+ * Each callable object tries pop greedy as many arguments as possible from the stack. So if a
+ * callable object has several overloaded call operators that match the next set of values on the
+ * stack, then the one with the maximum matching arguments is chosen.
+ * If the last callable object is of result type void, then the result of the overall interpret(...)
+ * call is an object of type std::monostate.
+ *
+ * It evaluates a sequence of functions, e.g. h(g(f(x), y)) with
+ *          f = [](auto a) { return b; }
+ *          g = [](auto b, auto c) { return d; }
+ *          h = [](auto d) { return e; }
+ *
+ *          interpret(std::make_tuple(f, g, h))(a, b);
+ *
+ * @tparam Fs A list of callable types
+ * @param sequence A tuple of callables that can consume in a Forth like manner all values that
+ *                 passed as arguments to the resulting callable object
+ * @return A callable object that can consume all given arguments.
+ */
 template <class... Fs>
-constexpr auto tuple_compose_greedy(std::tuple<Fs...>&& sequence) {
+constexpr auto interpret(std::tuple<Fs...>&& sequence) {
     return [_sequence = std::move(sequence)]<typename... Args>(Args&&... args) mutable {
-        return detail::calc(std::move(_sequence), std::forward<Args>(args)...);
+        return detail::interpret_impl(std::move(_sequence), std::forward<Args>(args)...);
     };
 }
-
-//--------------------------------------------------------------------------------------------------
 
 } // namespace chains::inline CHAINS_VERSION_NAMESPACE()
 
