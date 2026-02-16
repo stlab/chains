@@ -59,15 +59,27 @@ add_library(chains::chains_warnings ALIAS chains_warnings)
 
 
 add_library(chains INTERFACE)
-add_library(chains::chains ALIAS stlab)
+add_library(chains::chains ALIAS chains)
 
-target_include_directories(stlab INTERFACE
+target_include_directories(chains INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>/include
   $<INSTALL_INTERFACE:include>)
 
 # configure files based on CMake configuration options
 add_subdirectory(configured_files)
+
+#
+# Several definitions are specified for the microsoft compiler. These have
+# the following effects.
+#
+# + NOMINMAX
+#    disable the `min` and `max` macros defined in the windows.h header
+#
+if (WIN32)
+  target_compile_definitions(chains INTERFACE NOMINMAX)
+endif()
+
 
 add_subdirectory(include/chains)
 # Adding the src:

@@ -30,9 +30,9 @@ jobs:
       # and your own projects needs
       matrix:
         os:
-          - ubuntu-20.04
-          - macos-10.15
-          - windows-2019
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
         compiler:
           # you can specify the version after `-` like "llvm-15.0.2".
           - llvm-19.1.1
@@ -52,6 +52,8 @@ jobs:
           # mingw is determined by this author to be too buggy to support
           - os: windows-latest
             compiler: gcc-14
+          - os: windows-latest
+            compiler: llvm-19.1.1
 
         include:
           # Add appropriate variables for gcov version required. This will intentionally break
@@ -69,7 +71,7 @@ jobs:
 
           # Set up preferred package generators, for given build configurations
           - build_type: Release
-            packaging_maintainer_mode: OFF
+            packaging_maintainer_mode: On
             package_generator: TBZ2
 
           # This exists solely to make sure a non-multiconfig build works
@@ -184,19 +186,12 @@ jobs:
         run: |
           OpenCppCoverage.exe --export_type cobertura:coverage.xml --cover_children -- ctest -C ${{matrix.build_type}}
 
-      - name: CPack
-        if: matrix.package_generator != ''
-        working-directory: ./build
-        run: |
-          cpack -C ${{matrix.build_type}} -G ${{matrix.package_generator}}
-
       - name: Publish Tagged Release
         uses: softprops/action-gh-release@v2
         if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.package_generator != '' }}
         with:
           files: |
             build/*-*${{ matrix.build_type }}*-*.*
-
 
       - name: Publish to codecov
         uses: codecov/codecov-action@v5
