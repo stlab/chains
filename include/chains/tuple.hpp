@@ -94,6 +94,11 @@ constexpr auto invoke_prefix(F&& f, Tuple&& t) {
     }
 }
 
+template <std::size_t Offset, class Tuple, std::size_t... Is>
+constexpr auto move_tuple_tail_at_impl(Tuple&& t, std::index_sequence<Is...>) {
+    return std::tuple{std::move(std::get<Offset + Is>(t))...};
+}
+
 } // namespace detail
 
 //--------------------------------------------------------------------------------------------------
@@ -115,10 +120,13 @@ auto tuple_compose(std::tuple<Fs...>&& sequence) {
 
 //--------------------------------------------------------------------------------------------------
 
-/* Construct tuple tail starting at Offset (compile time) */
-template <class Tuple, std::size_t Offset, std::size_t... Is>
-constexpr auto tuple_tail_at(Tuple&& t, std::index_sequence<Is...>) {
-    return std::tuple{std::move(std::get<Offset + Is>(t))...};
+/*
+ * Take the remainder of a given tuple starting at Offset
+ */
+template <std::size_t Offset, class Tuple>
+constexpr auto move_tuple_tail_at(Tuple&& t) {
+    return detail::move_tuple_tail_at_impl<Offset, Tuple>(
+        std::move(t), std::make_index_sequence<std::tuple_size_v<Tuple> - Offset>{});
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -142,8 +150,7 @@ constexpr auto tuple_consume(Tuple&& values) {
             // Remaining is original tuple (no elements consumed)
             return std::tuple_cat(std::tuple{std::move(result)}, std::move(_values));
         } else {
-            auto remaining = tuple_tail_at<tuple_t, consumed>(
-                std::move(_values), std::make_index_sequence<N - consumed>{});
+            auto remaining = move_tuple_tail_at<consumed, tuple_t>(std::move(_values));
             return std::tuple_cat(std::tuple{std::move(result)}, std::move(remaining));
         }
     };
@@ -166,7 +173,7 @@ constexpr auto interpret_impl_step(F& f, T t) {
     } else {
         auto&& fn = std::get<I>(f);
         auto next = chains::tuple_consume(std::move(t))(fn);
-        return calc_step<I + 1>(f, std::move(next));
+        return interpret_impl_step<I + 1>(f, std::move(next));
     }
 }
 
