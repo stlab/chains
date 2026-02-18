@@ -7,7 +7,7 @@ target_sources( chains INTERFACE
         #chains.hpp
         config.hpp
         #on.hpp
-        #segment.hpp
+        segment.hpp
         #split.hpp
         #start.hpp
         #sync_wait.hpp

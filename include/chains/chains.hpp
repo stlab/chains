@@ -163,17 +163,6 @@ public:
             std::forward<Args>(args)...);
     }
 
-#if 0
-        template <class... Args>
-        [[deprecated]] auto operator()(Args&&... args) && {
-            using result_t = result_type<Args...>;
-            auto [receiver, future] =
-                stlab::package<result_t(result_t)>(stlab::immediate_executor, std::identity{});
-            invoke(std::move(receiver), std::forward<Args>(args)...);
-            return std::move(future);
-        }
-#endif
-
     template <class F>
     friend auto operator|(chain&& c, F&& f) {
         return std::move(c).append(std::forward<F>(f));

@@ -1,7 +1,7 @@
 /*
-Copyright 2026 Adobe
-  Distributed under the Boost Software License, Version 1.0.
-  (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+    Copyright 2026 Adobe
+    Distributed under the Boost Software License, Version 1.0.
+    (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
 #ifndef CHAINS_SEGMENT_HPP
@@ -9,25 +9,14 @@ Copyright 2026 Adobe
 
 #include <chains/config.hpp>
 
-#include <memory>
 #include <tuple>
 #include <utility>
 
 namespace chains {
 inline namespace CHAINS_VERSION_NAMESPACE() {
+
 template <class T>
 struct type {};
-
-template <class Injects, class Applicator, class... Fs>
-class segment;
-
-#if 0
-    template <class Injects, class Applicator, class... Fs>
-    inline auto make_segment(Applicator&& apply, Fs&&... fs) {
-        return segment<Injects, std::decay_t<Applicator>, std::decay_t<Fs>...>{
-            std::forward<Applicator>(apply), std::forward<Fs>(fs)...};
-    }
-#endif
 
 template <class Injects, class Applicator, class... Fs>
 class segment {
@@ -45,11 +34,12 @@ public:
     */
     template <class... Args>
     auto result_type_helper(Args&&... args) && {
-        return tuple_compose_greedy(std::move(_functions))(std::forward<Args>(args)...);
+        return interpret(std::move(_functions))(std::forward<Args>(args)...);
     }
 
     explicit segment(type<Injects>, Applicator&& apply, std::tuple<Fs...>&& functions)
         : _functions{std::move(functions)}, _apply{std::move(apply)} {}
+
     explicit segment(type<Injects>, Applicator&& apply, Fs&&... functions)
         : _functions{std::move(functions)...}, _apply{std::move(apply)} {}
 
@@ -69,12 +59,6 @@ public:
             std::tuple_cat(std::move(_functions), std::tuple{std::forward<F>(f)})};
     }
 
-#if 0
-        template <class... Args>
-        auto operator()(Args&&... args) && /* const/non-const version? - noexcept(...) */ {
-            return std::move(_apply)(compose_tuple(std::move(_functions)), std::forward<Args>(args)...);
-        }
-#endif
     /*
         The apply function for a segment always returns void.
 
@@ -88,7 +72,7 @@ public:
         // TODO: must handle this cancel prior to invoking the segment.
         // if (receiver.canceled()) return;
         return std::move(_apply)(
-            [_f = tuple_compose_greedy(std::move(_functions)),
+            [_f = interpret(std::move(_functions)),
              _receiver = std::forward<R>(receiver)]<typename... T>(T&&... args) mutable noexcept {
                 if (_receiver->canceled()) return;
                 try {
@@ -100,6 +84,13 @@ public:
             std::forward<Args>(args)...);
     }
 };
+
+template <class Injects, class Applicator, class... Fs>
+inline auto make_segment(Applicator&& apply, Fs&&... fs) {
+    return segment<Injects, std::decay_t<Applicator>, std::decay_t<Fs>...>{
+        std::forward<Applicator>(apply), std::forward<Fs>(fs)...};
+}
+
 } // namespace CHAINS_VERSION_NAMESPACE()
 } // namespace chains
 

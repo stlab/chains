@@ -21,7 +21,11 @@ endif()
 
 include(${Catch2_SOURCE_DIR}/extras/Catch.cmake)
 
-add_executable(tests main.cpp tuple_tests.cpp)
+add_executable(tests 
+  main.cpp
+  segment_tests.cpp
+  tuple_tests.cpp)
+
 target_link_libraries(
   tests
   PRIVATE chains::chains_warnings
