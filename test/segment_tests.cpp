@@ -11,7 +11,10 @@
 
 #include <exception>
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <tuple>
+#include <utility>
 
 // Mock receiver for testing invoke
 struct mock_receiver {
@@ -19,7 +22,7 @@ struct mock_receiver {
     std::exception_ptr _exception;
     int _result{0};
 
-    auto canceled() const -> bool { return _canceled; }
+    [[nodiscard]] auto canceled() const -> bool { return _canceled; }
     auto set_exception(std::exception_ptr e) -> void { _exception = std::move(e); }
     auto set_value(int value) -> void { _result = value; }
 };
@@ -50,7 +53,8 @@ TEST_CASE("Segment copy and move semantics", "[segment]") {
     SECTION("copy constructor") {
         auto original =
             chains::segment{chains::type<std::tuple<>>{}, [](auto f) { f(); }, []() { return 42; }};
-        [[maybe_unused]] auto copy{original}; // Use direct initialization due to explicit constructor
+        [[maybe_unused]] auto copy{
+            original}; // Use direct initialization due to explicit constructor
         // Both should be valid and independent
     }
 

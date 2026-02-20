@@ -14,8 +14,7 @@
 #include <tuple>
 #include <utility>
 
-namespace chains {
-inline namespace CHAINS_VERSION_NAMESPACE() {
+namespace chains::inline CHAINS_VERSION_NAMESPACE() {
 
 template <class T>
 struct type {};
@@ -51,8 +50,8 @@ public:
     */
     explicit segment(const segment&) = default;
     segment(segment&&) noexcept = default;
-    segment& operator=(const segment&) = default;
-    segment& operator=(segment&&) noexcept = default;
+    auto operator=(const segment&) -> segment& = default;
+    auto operator=(segment&&) noexcept -> segment& = default;
 
     template <class F>
     auto append(F&& f) && {
@@ -87,8 +86,6 @@ public:
     }
 };
 
-
-} // namespace CHAINS_VERSION_NAMESPACE()
-} // namespace chains
+} // namespace chains::inline CHAINS_VERSION_NAMESPACE()
 
 #endif

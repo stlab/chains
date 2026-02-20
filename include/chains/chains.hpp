@@ -190,10 +190,7 @@ auto operator|(segment<Injects, Applicator, Fs...>&& head, F&& f) {
 #include <stlab/concurrency/future.hpp>
 #include <variant>
 
-namespace chains::inline v1 {
-
-
-} // namespace chains::inline v1
+namespace chains::inline v1 {} // namespace chains::inline v1
 
 //--------------------------------------------------------------------------------------------------
 
@@ -207,7 +204,6 @@ using namespace chains;
 using namespace stlab;
 
 // Cancellation example
-
 
 TEST_CASE("Cancellation injection", "[initial_draft]") {
     {
