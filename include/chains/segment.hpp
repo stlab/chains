@@ -8,7 +8,9 @@
 #define CHAINS_SEGMENT_HPP
 
 #include <chains/config.hpp>
+#include <chains/tuple.hpp>
 
+#include <exception>
 #include <tuple>
 #include <utility>
 
@@ -85,11 +87,6 @@ public:
     }
 };
 
-template <class Injects, class Applicator, class... Fs>
-inline auto make_segment(Applicator&& apply, Fs&&... fs) {
-    return segment<Injects, std::decay_t<Applicator>, std::decay_t<Fs>...>{
-        std::forward<Applicator>(apply), std::forward<Fs>(fs)...};
-}
 
 } // namespace CHAINS_VERSION_NAMESPACE()
 } // namespace chains

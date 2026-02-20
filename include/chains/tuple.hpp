@@ -148,10 +148,10 @@ constexpr auto tuple_consume(Tuple&& values) {
 
         if constexpr (consumed == 0) {
             // Remaining is original tuple (no elements consumed)
-            return std::tuple_cat(std::tuple{std::move(result)}, std::move(_values));
+            return std::tuple_cat(std::make_tuple(std::move(result)), std::move(_values));
         } else {
             auto remaining = move_tuple_tail_at<consumed, tuple_t>(std::move(_values));
-            return std::tuple_cat(std::tuple{std::move(result)}, std::move(remaining));
+            return std::tuple_cat(std::make_tuple(std::move(result)), std::move(remaining));
         }
     };
 }
