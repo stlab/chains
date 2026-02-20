@@ -21,7 +21,8 @@ endif()
 
 include(${Catch2_SOURCE_DIR}/extras/Catch.cmake)
 
-add_executable(tests 
+add_executable(tests
+  chains_test.cpp
   main.cpp
   segment_tests.cpp
   tuple_tests.cpp)

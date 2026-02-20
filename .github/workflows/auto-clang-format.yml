@@ -1,5 +1,7 @@
 name: auto-clang-format
-on: [pull_request]
+on: 
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   build:
@@ -13,11 +15,4 @@ jobs:
         exclude: './third_party ./external'
         extensions: 'h,cpp,hpp'
         clangFormatVersion: 19
-        inplace: True
-    - uses: EndBug/add-and-commit@v9
-      with:
-        author_name: Clang Robot
-        author_email: robot@example.com
-        message: ':art: Committing clang-format changes'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        inplace: False

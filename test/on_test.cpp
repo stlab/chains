@@ -97,8 +97,9 @@ TEST_CASE("Initial draft", "[initial_draft]") {
     }
 
     GIVEN("a sequence of callables in a chain of chains synchronous") {
-        auto a0 = on(immediate_executor) | [](int x) { return x * 2; } | on(immediate_executor) | [](int x) { return to_string(x); } |
-            on(immediate_executor) | [](const string& s) { return s + "!"; };
+        auto a0 = on(immediate_executor) | [](int x) { return x * 2; } | on(immediate_executor) |
+                  [](int x) { return to_string(x); } | on(immediate_executor) |
+                  [](const string& s) { return s + "!"; };
 
         auto f = start(std::move(a0), 42);
         auto val = f.get_ready();
@@ -106,23 +107,24 @@ TEST_CASE("Initial draft", "[initial_draft]") {
     }
 
     GIVEN("a sequence of callables in a chain of chains asynchronous") {
-        auto a0 = on(default_executor) | [](int x) { return x * 2; } | on(immediate_executor) | [](int x) { return to_string(x); } |
-            on(default_executor) | [](const string& s) { return s + "!"; };
+        auto a0 = on(default_executor) | [](int x) { return x * 2; } | on(immediate_executor) |
+                  [](int x) { return to_string(x); } | on(default_executor) |
+                  [](const string& s) { return s + "!"; };
 
         auto val = sync_wait(std::move(a0), 42);
         REQUIRE(val == string("84!"));
     }
 }
 
-
 TEST_CASE("Cancellation of then()", "[initial_draft]") {
     annotate_counters cnt;
     GIVEN("that a ") {
-        auto fut = async(default_executor, [] {
-            std::this_thread::sleep_for(std::chrono::seconds{3});
-            std::cout << "Future did run" << std::endl;
-            return std::string("42");
-        }).then([_counter = annotate{cnt}](const auto& s) { std::cout << s << std::endl; });
+        auto fut =
+            async(default_executor, [] {
+                std::this_thread::sleep_for(std::chrono::seconds{3});
+                std::cout << "Future did run" << std::endl;
+                return std::string("42");
+            }).then([_counter = annotate{cnt}](const auto& s) { std::cout << s << std::endl; });
 
         auto result_f = start(then(fut));
     }

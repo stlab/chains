@@ -4,7 +4,7 @@ target_sources( chains INTERFACE
         BASE_DIRS ../
         FILES
 
-        #chains.hpp
+        chains.hpp
         config.hpp
         #on.hpp
         segment.hpp
