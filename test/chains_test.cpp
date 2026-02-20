@@ -2,11 +2,24 @@
 
 #include <chains/chains.hpp>
 
-#include <tuple>
+#include <utility>
 
 TEST_CASE("Basic chain operations", "[chain]") {
-    SECTION("") {
-        SECTION("") {}
+    SECTION("Can instantiate a simple chain") {
+        SECTION("Chain with two lambdas") {
+            // Create a simple chain by piping a segment with a function
+            auto s = chains::segment{chains::type<void>{},
+                                     []<typename... Args>(auto&& f, Args&&... args) {
+                                         return f(std::forward<Args>(args)...);
+                                     },
+                                     [](int x) { return x * 2; }};
+
+            auto c = std::move(s) | [](int x) { return x + 1; };
+
+            // c is now a chains::chain instance
+            // We can verify it compiles and the type is deduced correctly
+            (void)c; // Suppress unused variable warning
+        }
     }
 }
 
