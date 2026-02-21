@@ -7,7 +7,7 @@ include(CheckCXXCompilerFlag)
 include(CheckCXXSourceCompiles)
 
 
-macro(chains_supports_sanitizers)
+macro(chain_supports_sanitizers)
   # Emscripten doesn't support sanitizers
   if(EMSCRIPTEN)
     set(SUPPORTS_UBSAN OFF)
@@ -58,113 +58,113 @@ macro(chains_supports_sanitizers)
   endif()
 endmacro()
 
-macro(chains_setup_options)
-  option(chains_ENABLE_HARDENING "Enable hardening" ON)
-  option(chains_ENABLE_COVERAGE "Enable coverage reporting" OFF)
+macro(chain_setup_options)
+  option(chain_ENABLE_HARDENING "Enable hardening" ON)
+  option(chain_ENABLE_COVERAGE "Enable coverage reporting" OFF)
   cmake_dependent_option(
-    chains_ENABLE_GLOBAL_HARDENING
+    chain_ENABLE_GLOBAL_HARDENING
     "Attempt to push hardening options to built dependencies"
     ON
-    chains_ENABLE_HARDENING
+    chain_ENABLE_HARDENING
     OFF)
 
-  chains_supports_sanitizers()
+  chain_supports_sanitizers()
 
-  if(NOT PROJECT_IS_TOP_LEVEL OR chains_PACKAGING_MAINTAINER_MODE)
-    option(chains_ENABLE_IPO "Enable IPO/LTO" OFF)
-    option(chains_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
+  if(NOT PROJECT_IS_TOP_LEVEL OR chain_PACKAGING_MAINTAINER_MODE)
+    option(chain_ENABLE_IPO "Enable IPO/LTO" OFF)
+    option(chain_WARNINGS_AS_ERRORS "Treat Warnings As Errors" OFF)
 
-    option(chains_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" OFF)
-    option(chains_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
-    option(chains_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" OFF)
-    option(chains_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
-    option(chains_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
-    option(chains_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
-    option(chains_ENABLE_CLANG_TIDY "Enable clang-tidy" OFF)
-    option(chains_ENABLE_CPPCHECK "Enable cpp-check analysis" OFF)
-    option(chains_ENABLE_PCH "Enable precompiled headers" OFF)
-    option(chains_ENABLE_CACHE "Enable ccache" OFF)
+    option(chain_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" OFF)
+    option(chain_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
+    option(chain_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" OFF)
+    option(chain_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
+    option(chain_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
+    option(chain_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
+    option(chain_ENABLE_CLANG_TIDY "Enable clang-tidy" OFF)
+    option(chain_ENABLE_CPPCHECK "Enable cpp-check analysis" OFF)
+    option(chain_ENABLE_PCH "Enable precompiled headers" OFF)
+    option(chain_ENABLE_CACHE "Enable ccache" OFF)
   else()
-    option(chains_ENABLE_IPO "Enable IPO/LTO" ON)
-    option(chains_WARNINGS_AS_ERRORS "Treat Warnings As Errors" ON)
+    option(chain_ENABLE_IPO "Enable IPO/LTO" ON)
+    option(chain_WARNINGS_AS_ERRORS "Treat Warnings As Errors" ON)
 
-    option(chains_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${SUPPORTS_ASAN})
-    option(chains_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
-    option(chains_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${SUPPORTS_UBSAN})
-    option(chains_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
-    option(chains_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
-    option(chains_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
-    option(chains_ENABLE_CLANG_TIDY "Enable clang-tidy" ON)
-    option(chains_ENABLE_CPPCHECK "Enable cpp-check analysis" ON)
-    option(chains_ENABLE_PCH "Enable precompiled headers" OFF)
-    option(chains_ENABLE_CACHE "Enable ccache" ON)
+    option(chain_ENABLE_SANITIZER_ADDRESS "Enable address sanitizer" ${SUPPORTS_ASAN})
+    option(chain_ENABLE_SANITIZER_LEAK "Enable leak sanitizer" OFF)
+    option(chain_ENABLE_SANITIZER_UNDEFINED "Enable undefined sanitizer" ${SUPPORTS_UBSAN})
+    option(chain_ENABLE_SANITIZER_THREAD "Enable thread sanitizer" OFF)
+    option(chain_ENABLE_SANITIZER_MEMORY "Enable memory sanitizer" OFF)
+    option(chain_ENABLE_UNITY_BUILD "Enable unity builds" OFF)
+    option(chain_ENABLE_CLANG_TIDY "Enable clang-tidy" ON)
+    option(chain_ENABLE_CPPCHECK "Enable cpp-check analysis" ON)
+    option(chain_ENABLE_PCH "Enable precompiled headers" OFF)
+    option(chain_ENABLE_CACHE "Enable ccache" ON)
   endif()
 
   if(NOT PROJECT_IS_TOP_LEVEL)
     mark_as_advanced(
-      chains_ENABLE_IPO
-      chains_WARNINGS_AS_ERRORS
+      chain_ENABLE_IPO
+      chain_WARNINGS_AS_ERRORS
 
-      chains_ENABLE_SANITIZER_ADDRESS
-      chains_ENABLE_SANITIZER_LEAK
-      chains_ENABLE_SANITIZER_UNDEFINED
-      chains_ENABLE_SANITIZER_THREAD
-      chains_ENABLE_SANITIZER_MEMORY
-      chains_ENABLE_UNITY_BUILD
-      chains_ENABLE_CLANG_TIDY
-      chains_ENABLE_CPPCHECK
-      chains_ENABLE_COVERAGE
-      chains_ENABLE_PCH
-      chains_ENABLE_CACHE)
+      chain_ENABLE_SANITIZER_ADDRESS
+      chain_ENABLE_SANITIZER_LEAK
+      chain_ENABLE_SANITIZER_UNDEFINED
+      chain_ENABLE_SANITIZER_THREAD
+      chain_ENABLE_SANITIZER_MEMORY
+      chain_ENABLE_UNITY_BUILD
+      chain_ENABLE_CLANG_TIDY
+      chain_ENABLE_CPPCHECK
+      chain_ENABLE_COVERAGE
+      chain_ENABLE_PCH
+      chain_ENABLE_CACHE)
   endif()
 
-  # chains_check_libfuzzer_support(LIBFUZZER_SUPPORTED)
-  # if(LIBFUZZER_SUPPORTED AND (chains_ENABLE_SANITIZER_ADDRESS OR chains_ENABLE_SANITIZER_THREAD OR chains_ENABLE_SANITIZER_UNDEFINED))
+  # chain_check_libfuzzer_support(LIBFUZZER_SUPPORTED)
+  # if(LIBFUZZER_SUPPORTED AND (chain_ENABLE_SANITIZER_ADDRESS OR chain_ENABLE_SANITIZER_THREAD OR chain_ENABLE_SANITIZER_UNDEFINED))
   #   set(DEFAULT_FUZZER ON)
   # else()
   #   set(DEFAULT_FUZZER OFF)
   # endif()
 
-  # option(chains_BUILD_FUZZ_TESTS "Enable fuzz testing executable" ${DEFAULT_FUZZER})
+  # option(chain_BUILD_FUZZ_TESTS "Enable fuzz testing executable" ${DEFAULT_FUZZER})
 
 endmacro()
 
-macro(chains_global_options)
-  if(chains_ENABLE_IPO)
+macro(chain_global_options)
+  if(chain_ENABLE_IPO)
     include(cmake/InterproceduralOptimization.cmake)
-    chains_enable_ipo()
+    chain_enable_ipo()
   endif()
 
-  chains_supports_sanitizers()
+  chain_supports_sanitizers()
 
-  if(chains_ENABLE_HARDENING AND chains_ENABLE_GLOBAL_HARDENING)
+  if(chain_ENABLE_HARDENING AND chain_ENABLE_GLOBAL_HARDENING)
     include(cmake/Hardening.cmake)
     if(NOT SUPPORTS_UBSAN 
-       OR chains_ENABLE_SANITIZER_UNDEFINED
-       OR chains_ENABLE_SANITIZER_ADDRESS
-       OR chains_ENABLE_SANITIZER_THREAD
-       OR chains_ENABLE_SANITIZER_LEAK)
+       OR chain_ENABLE_SANITIZER_UNDEFINED
+       OR chain_ENABLE_SANITIZER_ADDRESS
+       OR chain_ENABLE_SANITIZER_THREAD
+       OR chain_ENABLE_SANITIZER_LEAK)
       set(ENABLE_UBSAN_MINIMAL_RUNTIME FALSE)
     else()
       set(ENABLE_UBSAN_MINIMAL_RUNTIME TRUE)
     endif()
-    message("${chains_ENABLE_HARDENING} ${ENABLE_UBSAN_MINIMAL_RUNTIME} ${chains_ENABLE_SANITIZER_UNDEFINED}")
-    chains_enable_hardening(chains_options ON ${ENABLE_UBSAN_MINIMAL_RUNTIME})
+    message("${chain_ENABLE_HARDENING} ${ENABLE_UBSAN_MINIMAL_RUNTIME} ${chain_ENABLE_SANITIZER_UNDEFINED}")
+    chain_enable_hardening(chain_options ON ${ENABLE_UBSAN_MINIMAL_RUNTIME})
   endif()
 endmacro()
 
-macro(chains_local_options)
+macro(chain_local_options)
   if(PROJECT_IS_TOP_LEVEL)
     include(cmake/StandardProjectSettings.cmake)
   endif()
 
-  add_library(chains_warnings INTERFACE)
-  add_library(chains_options INTERFACE)
+  add_library(chain_warnings INTERFACE)
+  add_library(chain_options INTERFACE)
 
   include(cmake/CompilerWarnings.cmake)
-  chains_set_project_warnings(
-    chains_warnings
-    ${chains_WARNINGS_AS_ERRORS}
+  chain_set_project_warnings(
+    chain_warnings
+    ${chain_WARNINGS_AS_ERRORS}
     ""
     ""
     ""
@@ -174,65 +174,65 @@ macro(chains_local_options)
   # Must configure each target with linker options, we're avoiding setting it globally for now
 
   include(cmake/Sanitizers.cmake)
-  chains_enable_sanitizers(
-    chains_options
-    ${chains_ENABLE_SANITIZER_ADDRESS}
-    ${chains_ENABLE_SANITIZER_LEAK}
-    ${chains_ENABLE_SANITIZER_UNDEFINED}
-    ${chains_ENABLE_SANITIZER_THREAD}
-    ${chains_ENABLE_SANITIZER_MEMORY})
+  chain_enable_sanitizers(
+    chain_options
+    ${chain_ENABLE_SANITIZER_ADDRESS}
+    ${chain_ENABLE_SANITIZER_LEAK}
+    ${chain_ENABLE_SANITIZER_UNDEFINED}
+    ${chain_ENABLE_SANITIZER_THREAD}
+    ${chain_ENABLE_SANITIZER_MEMORY})
 
-  set_target_properties(chains_options PROPERTIES UNITY_BUILD ${chains_ENABLE_UNITY_BUILD})
+  set_target_properties(chain_options PROPERTIES UNITY_BUILD ${chain_ENABLE_UNITY_BUILD})
 
-  if(chains_ENABLE_PCH)
+  if(chain_ENABLE_PCH)
     target_precompile_headers(
-      chains_options
+      chain_options
       INTERFACE
       <vector>
       <string>
       <utility>)
   endif()
 
-  if(chains_ENABLE_CACHE)
+  if(chain_ENABLE_CACHE)
     include(cmake/Cache.cmake)
-    chains_enable_cache()
+    chain_enable_cache()
   endif()
 
   include(cmake/StaticAnalyzers.cmake)
-  if(chains_ENABLE_CLANG_TIDY)
-    chains_enable_clang_tidy(chains_options ${chains_WARNINGS_AS_ERRORS})
+  if(chain_ENABLE_CLANG_TIDY)
+    chain_enable_clang_tidy(chain_options ${chain_WARNINGS_AS_ERRORS})
   endif()
 
-  if(chains_ENABLE_CPPCHECK)
-    chains_enable_cppcheck(${chains_WARNINGS_AS_ERRORS} "" # override cppcheck options
+  if(chain_ENABLE_CPPCHECK)
+    chain_enable_cppcheck(${chain_WARNINGS_AS_ERRORS} "" # override cppcheck options
     )
   endif()
 
-  if(chains_ENABLE_COVERAGE)
+  if(chain_ENABLE_COVERAGE)
     include(cmake/Tests.cmake)
-    chains_enable_coverage(chains_options)
+    chain_enable_coverage(chain_options)
   endif()
 
-  if(chains_WARNINGS_AS_ERRORS)
+  if(chain_WARNINGS_AS_ERRORS)
     check_cxx_compiler_flag("-Wl,--fatal-warnings" LINKER_FATAL_WARNINGS)
     if(LINKER_FATAL_WARNINGS)
       # This is not working consistently, so disabling for now
-      # target_link_options(chains_options INTERFACE -Wl,--fatal-warnings)
+      # target_link_options(chain_options INTERFACE -Wl,--fatal-warnings)
     endif()
   endif()
 
-  if(chains_ENABLE_HARDENING AND NOT chains_ENABLE_GLOBAL_HARDENING)
+  if(chain_ENABLE_HARDENING AND NOT chain_ENABLE_GLOBAL_HARDENING)
     include(cmake/Hardening.cmake)
     if(NOT SUPPORTS_UBSAN 
-       OR chains_ENABLE_SANITIZER_UNDEFINED
-       OR chains_ENABLE_SANITIZER_ADDRESS
-       OR chains_ENABLE_SANITIZER_THREAD
-       OR chains_ENABLE_SANITIZER_LEAK)
+       OR chain_ENABLE_SANITIZER_UNDEFINED
+       OR chain_ENABLE_SANITIZER_ADDRESS
+       OR chain_ENABLE_SANITIZER_THREAD
+       OR chain_ENABLE_SANITIZER_LEAK)
       set(ENABLE_UBSAN_MINIMAL_RUNTIME FALSE)
     else()
       set(ENABLE_UBSAN_MINIMAL_RUNTIME TRUE)
     endif()
-    chains_enable_hardening(chains_options OFF ${ENABLE_UBSAN_MINIMAL_RUNTIME})
+    chain_enable_hardening(chain_options OFF ${ENABLE_UBSAN_MINIMAL_RUNTIME})
   endif()
 
 endmacro()

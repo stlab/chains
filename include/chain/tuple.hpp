@@ -7,7 +7,7 @@
 #ifndef CHAIN_TUPLE_HPP
 #define CHAIN_TUPLE_HPP
 
-#include <chains/config.hpp>
+#include <chain/config.hpp>
 
 #include <cstddef>     // std::size_t
 #include <functional>  // std::invoke
@@ -16,7 +16,7 @@
 #include <utility>     // std::forward, std::move, std::index_sequence, std::make_index_sequence
 #include <variant>     // std::monostate
 
-namespace chains::inline CHAINS_VERSION_NAMESPACE() {
+namespace chain::inline CHAIN_VERSION_NAMESPACE() {
 
 //--------------------------------------------------------------------------------------------------
 
@@ -172,7 +172,7 @@ constexpr auto interpret_impl_step(F& f, T t) {
         }
     } else {
         auto&& fn = std::get<I>(f);
-        auto next = chains::tuple_consume(std::move(t))(fn);
+        auto next = chain::tuple_consume(std::move(t))(fn);
         return interpret_impl_step<I + 1>(f, std::move(next));
     }
 }
@@ -216,7 +216,7 @@ constexpr auto interpret(std::tuple<Fs...>&& sequence) {
     };
 }
 
-} // namespace chains::inline CHAINS_VERSION_NAMESPACE()
+} // namespace chain::inline CHAIN_VERSION_NAMESPACE()
 
 //--------------------------------------------------------------------------------------------------
 

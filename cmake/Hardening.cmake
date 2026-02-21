@@ -1,7 +1,7 @@
 include(CheckCXXCompilerFlag)
 
 macro(
-  chains_enable_hardening
+  chain_enable_hardening
   target
   global
   ubsan_minimal_runtime)

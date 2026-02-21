@@ -4,19 +4,19 @@ Copyright 2026 Adobe
   (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-#ifndef CHAINS_ON_HPP
-#define CHAINS_ON_HPP
+#ifndef CHAIN_ON_HPP
+#define CHAIN_ON_HPP
 
-#include <chains/config.hpp>
-#include <chains/segment.hpp>
+#include <chain/config.hpp>
+#include <chain/segment.hpp>
 
 #include <atomic>
 #include <memory>
 #include <tuple>
 #include <utility>
 
-namespace chains {
-inline namespace CHAINS_VERSION_NAMESPACE() {
+namespace chain {
+inline namespace CHAIN_VERSION_NAMESPACE() {
 
 /*
 
@@ -54,7 +54,7 @@ struct cancellation_token {
 // Segment that injects a cancellation_token (Injects != void)
 inline auto with_cancellation(cancellation_source src) {
     return segment{
-        chains::type<cancellation_token>{},
+        chain::type<cancellation_token>{},
         [_src = std::move(src)]<typename F, typename... Args>(F&& f, Args&&... args) mutable {
             // Create token and forward it as first argument
             cancellation_token token{_src._state};
@@ -65,8 +65,8 @@ inline auto with_cancellation(cancellation_source src) {
 // executor variant that also injects the token and schedules asynchronously
 template <class E>
 auto on_with_cancellation(E&& executor, cancellation_source source) {
-    return chains::segment{
-        chains::type<cancellation_token>{},
+    return chain::segment{
+        chain::type<cancellation_token>{},
         [_executor = std::forward<E>(executor),
          _source = std::move(source)]<typename F, typename... Args>(F&& f, Args&&... args) mutable {
             cancellation_token token{_source._state};
@@ -81,7 +81,7 @@ auto on_with_cancellation(E&& executor, cancellation_source source) {
                 });
         }};
 }
-} // namespace CHAINS_VERSION_NAMESPACE()
-} // namespace chains
+} // namespace CHAIN_VERSION_NAMESPACE()
+} // namespace chain
 
 #endif

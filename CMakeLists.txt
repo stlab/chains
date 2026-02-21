@@ -19,23 +19,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Set the project name and language
 project(
-  chains
+  chain
   VERSION 0.0.1
   DESCRIPTION ""
-  HOMEPAGE_URL "https://github.com/stlab/chains"
+  HOMEPAGE_URL "https://github.com/stlab/chain"
   LANGUAGES CXX C)
 
 include(cmake/PreventInSourceBuilds.cmake)
 include(ProjectOptions.cmake)
 
 
-chains_setup_options()
+chain_setup_options()
 
-chains_global_options()
+chain_global_options()
 include(Dependencies.cmake)
-chains_setup_dependencies()
+chain_setup_dependencies()
 
-chains_local_options()
+chain_local_options()
 
 # don't know if this should be set globally from here or not...
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -49,19 +49,19 @@ string(
             8
             GIT_SHORT_SHA)
 
-target_compile_features(chains_options INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
+target_compile_features(chain_options INTERFACE cxx_std_${CMAKE_CXX_STANDARD})
 
-add_library(chains::chains_options ALIAS chains_options)
-add_library(chains::chains_warnings ALIAS chains_warnings)
+add_library(chain::chain_options ALIAS chain_options)
+add_library(chain::chain_warnings ALIAS chain_warnings)
 
-#add_library(chains::chains_options INTERFACE IMPORTED)
-#add_library(chains::chains_warnings INTERFACE IMPORTED)
+#add_library(chain::chain_options INTERFACE IMPORTED)
+#add_library(chain::chain_warnings INTERFACE IMPORTED)
 
 
-add_library(chains INTERFACE)
-add_library(chains::chains ALIAS chains)
+add_library(chain INTERFACE)
+add_library(chain::chain ALIAS chain)
 
-target_include_directories(chains INTERFACE
+target_include_directories(chain INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/include
   $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>/include
   $<INSTALL_INTERFACE:include>)
@@ -77,11 +77,11 @@ add_subdirectory(configured_files)
 #    disable the `min` and `max` macros defined in the windows.h header
 #
 if (WIN32)
-  target_compile_definitions(chains INTERFACE NOMINMAX)
+  target_compile_definitions(chain INTERFACE NOMINMAX)
 endif()
 
 
-add_subdirectory(include/chains)
+add_subdirectory(include/chain)
 # Adding the src:
 add_subdirectory(src)
 
@@ -99,9 +99,9 @@ if(BUILD_TESTING)
 endif()
 
 
-# if(chains_BUILD_FUZZ_TESTS)
+# if(chain_BUILD_FUZZ_TESTS)
 #   message(AUTHOR_WARNING "Building Fuzz Tests, using fuzzing sanitizer https://www.llvm.org/docs/LibFuzzer.html")
-#   if (NOT chains_ENABLE_ADDRESS_SANITIZER AND NOT chains_ENABLE_THREAD_SANITIZER)
+#   if (NOT chain_ENABLE_ADDRESS_SANITIZER AND NOT chain_ENABLE_THREAD_SANITIZER)
 #     message(WARNING "You need asan or tsan enabled for meaningful fuzz testing")
 #   endif()
 #   add_subdirectory(fuzz_test)
@@ -127,11 +127,11 @@ endif()
 
 # Add other targets that you want installed here, by default we just package the one executable
 # we know we want to ship
-# chains_package_project(
+# chain_package_project(
 #   TARGETS
 #   intro
-#   chains_options
-#   chains_warnings
+#   chain_options
+#   chain_warnings
 #   # FIXME: this does not work! CK
 #   # PRIVATE_DEPENDENCIES_CONFIGURED project_options project_warnings
 # )

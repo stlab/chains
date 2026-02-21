@@ -1,6 +1,6 @@
 # Uses ycm (permissive BSD-3-Clause license) and ForwardArguments (permissive MIT license)
 
-function(chains_package_project)
+function(chain_package_project)
   cmake_policy(SET CMP0103 NEW) # disallow multiple calls with the same NAME
 
   set(_options ARCH_INDEPENDENT # default to false

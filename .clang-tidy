@@ -11,4 +11,4 @@ CheckOptions:
     value: >
       boost/test/.*;
       __chrono/.*
-HeaderFilterRegex: '^.*/include/chains/.*$'
+HeaderFilterRegex: '^.*/include/chain/.*$'

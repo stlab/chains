@@ -96,7 +96,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         REQUIRE(46 == val.member());
     }
 
-    GIVEN("a sequence of callables in a chain of chains synchronous") {
+    GIVEN("a sequence of callables in a chain of chain synchronous") {
         auto a0 = on(immediate_executor) | [](int x) { return x * 2; } | on(immediate_executor) |
                   [](int x) { return to_string(x); } | on(immediate_executor) |
                   [](const string& s) { return s + "!"; };
@@ -106,7 +106,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         REQUIRE(val == string("84!"));
     }
 
-    GIVEN("a sequence of callables in a chain of chains asynchronous") {
+    GIVEN("a sequence of callables in a chain of chain asynchronous") {
         auto a0 = on(default_executor) | [](int x) { return x * 2; } | on(immediate_executor) |
                   [](int x) { return to_string(x); } | on(default_executor) |
                   [](const string& s) { return s + "!"; };

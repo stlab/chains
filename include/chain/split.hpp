@@ -4,10 +4,10 @@ Copyright 2026 Adobe
   (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-#ifndef CHAINS_SPLIT_HPP
-#define CHAINS_SPLIT_HPP
+#ifndef CHAIN_SPLIT_HPP
+#define CHAIN_SPLIT_HPP
 
-#include <chains/config.hpp>
+#include <chain/config.hpp>
 
 #include <condition_variable>
 #include <exception>
@@ -17,8 +17,8 @@ Copyright 2026 Adobe
 #include <optional>
 #include <type_traits>
 
-namespace chains {
-inline namespace CHAINS_VERSION_NAMESPACE() {
+namespace chain {
+inline namespace CHAIN_VERSION_NAMESPACE() {
 
 template <class T>
     requires std::is_copy_constructible_v<T>
@@ -219,7 +219,7 @@ auto split_bind(Chain&& c, Args&&... args) {
         std::forward<Chain>(c), std::forward<Args>(args)...};
 }
 
-} // namespace CHAINS_VERSION_NAMESPACE()
-} // namespace chains
+} // namespace CHAIN_VERSION_NAMESPACE()
+} // namespace chain
 
 #endif

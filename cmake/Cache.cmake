@@ -1,5 +1,5 @@
 # Enable cache if available
-function(chains_enable_cache)
+function(chain_enable_cache)
   set(CACHE_OPTION
       "ccache"
       CACHE STRING "Compiler cache to be used")

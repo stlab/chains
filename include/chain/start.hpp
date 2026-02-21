@@ -4,16 +4,16 @@ Copyright 2026 Adobe
   (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-#ifndef CHAINS_START_HPP
-#define CHAINS_START_HPP
+#ifndef CHAIN_START_HPP
+#define CHAIN_START_HPP
 
-#include <chains/config.hpp>
+#include <chain/config.hpp>
 
 #include <stlab/concurrency/await.hpp>
 #include <stlab/concurrency/future.hpp>
 
-namespace chains {
-inline namespace CHAINS_VERSION_NAMESPACE() {
+namespace chain {
+inline namespace CHAIN_VERSION_NAMESPACE() {
 
 template <class Chain, class... Args>
 inline auto start(Chain&& chain, Args&&... args) {
@@ -51,7 +51,7 @@ inline auto start(Chain&& chain, Args&&... args) {
     }
 }
 
-} // namespace CHAINS_VERSION_NAMESPACE()
-} // namespace chains
+} // namespace CHAIN_VERSION_NAMESPACE()
+} // namespace chain
 
 #endif

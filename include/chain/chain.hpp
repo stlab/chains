@@ -4,12 +4,12 @@
     (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-#ifndef CHAINS_CHAINS_HPP
-#define CHAINS_CHAINS_HPP
+#ifndef CHAIN_CHAIN_HPP
+#define CHAIN_CHAIN_HPP
 
-#include <chains/config.hpp>
-#include <chains/segment.hpp>
-#include <chains/tuple.hpp>
+#include <chain/config.hpp>
+#include <chain/segment.hpp>
+#include <chain/tuple.hpp>
 
 #include <exception>
 #include <tuple>
@@ -24,7 +24,7 @@ set on the receiver.
 
 */
 
-namespace chains::inline CHAINS_VERSION_NAMESPACE() {
+namespace chain::inline CHAIN_VERSION_NAMESPACE() {
 
 /*
 segment is invoked with a receiver -
@@ -147,13 +147,13 @@ public:
     // append function to the last sequence
     template <class F>
     auto append(F&& f) && {
-        return chains::chain{std::move(_tail), std::move(_head).append(std::forward<F>(f))};
+        return chain{std::move(_tail), std::move(_head).append(std::forward<F>(f))};
     }
 
     template <class Jnjects, class I, class... Gs>
     auto append(segment<Jnjects, I, Gs...>&& head) && {
-        return chains::chain{std::tuple_cat(std::move(_tail), std::tuple{std::move(_head)}),
-                             std::move(head)};
+        return chain{std::tuple_cat(std::move(_tail), std::tuple{std::move(_head)}),
+                     std::move(head)};
     }
 
     template <class Receiver, class... Args>
@@ -182,6 +182,6 @@ auto operator|(segment<Injects, Applicator, Fs...>&& head, F&& f) {
     return chain{std::tuple<>{}, std::move(head).append(std::forward<F>(f))};
 }
 
-} // namespace chains::inline CHAINS_VERSION_NAMESPACE()
+} // namespace chain::inline CHAIN_VERSION_NAMESPACE()
 
 #endif

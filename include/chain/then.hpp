@@ -4,17 +4,17 @@ Copyright 2026 Adobe
   (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-#ifndef CHAINS_THEN_HPP
-#define CHAINS_THEN_HPP
+#ifndef CHAIN_THEN_HPP
+#define CHAIN_THEN_HPP
 
-#include <chains/chains.hpp>
-#include <chains/config.hpp>
+#include <chain/chain.hpp>
+#include <chain/config.hpp>
 
 #include <type_traits>
 #include <utility>
 
-namespace chains {
-inline namespace CHAINS_VERSION_NAMESPACE() {
+namespace chain {
+inline namespace CHAIN_VERSION_NAMESPACE() {
 
 /*
     The `then` algorithm takes a future and returns a segment (chain) that will schedule the
@@ -43,7 +43,7 @@ auto then(F&& future) {
 // TODO: (sean-parent) - should we make this pipeable?
 // TODO: (sean-parent) - fix case where invoke_t is void.
 
-} // namespace CHAINS_VERSION_NAMESPACE()
-} // namespace chains
+} // namespace CHAIN_VERSION_NAMESPACE()
+} // namespace chain
 
 #endif
