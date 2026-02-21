@@ -48,7 +48,7 @@ public:
         The basic operations should follow those from C++ lambdas, for now default everything.
         and see if the compiler gets it correct.
     */
-    explicit segment(const segment&) = default;
+    segment(const segment&) = default;
     segment(segment&&) noexcept = default;
     auto operator=(const segment&) -> segment& = default;
     auto operator=(segment&&) noexcept -> segment& = default;

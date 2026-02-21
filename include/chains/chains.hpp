@@ -69,17 +69,17 @@ class chain {
     static consteval auto result_type_helper(Tail&& tail,
                                              segment<Injects, Applicator, Fs...>&& head) {
         return detail::fold_over(
-            []<typename Fold, typename First, typename... Rest>([[maybe_unused]] Fold fold,
-                                                                First&& first, Rest&&... rest) {
+            []<typename Fold, typename First, typename... Rest>(
+                [[maybe_unused]] Fold fold, First&& first, Rest&&... rest) -> auto {
                 if constexpr (sizeof...(rest) == 0) {
                     return [_segment = std::forward<First>(first)]<typename... Args>(
-                               Args&&... args) mutable {
+                               Args&&... args) mutable -> auto {
                         return std::move(_segment).result_type_helper(std::forward<Args>(args)...);
                     };
                 } else {
                     return [_segment = std::forward<First>(first).append(
                                 fold(fold, std::forward<Rest>(rest)...))]<typename... Args>(
-                               Args&&... args) mutable {
+                               Args&&... args) mutable -> auto {
                         return std::move(_segment).result_type_helper(std::forward<Args>(args)...);
                     };
                 }
@@ -92,18 +92,18 @@ class chain {
         return detail::fold_over(
             [_receiver =
                  std::forward<R>(receiver)]<typename Fold, typename First, typename... Rest>(
-                [[maybe_unused]] Fold fold, First&& first, Rest&&... rest) mutable {
+                [[maybe_unused]] Fold fold, First&& first, Rest&&... rest) mutable -> auto {
                 if constexpr (sizeof...(rest) == 0) {
                     return [_receiver, _segment = std::forward<First>(first).append(
                                            [_receiver]<typename V>(V&& val) {
                                                _receiver->operator()(std::forward<V>(val));
-                                           })]<typename... Args>(Args&&... args) mutable {
+                                           })]<typename... Args>(Args&&... args) mutable -> auto {
                         return std::move(_segment).invoke(_receiver, std::forward<Args>(args)...);
                     };
                 } else {
                     return [_receiver, _segment = std::forward<First>(first).append(fold(
                                            fold, std::forward<Rest>(rest)...))]<typename... Args>(
-                               Args&&... args) mutable {
+                               Args&&... args) mutable -> auto {
                         return std::move(_segment).invoke(_receiver, std::forward<Args>(args)...);
                     };
                 }

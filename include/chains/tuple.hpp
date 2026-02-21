@@ -25,7 +25,7 @@ namespace detail {
 /* Map void return to std::monostate */
 template <class F>
 auto void_to_monostate(F& f) {
-    return [&_f = f]<typename... Args>(Args&&... args) mutable {
+    return [&_f = f]<typename... Args>(Args&&... args) mutable -> auto {
         if constexpr (std::is_same_v<decltype(std::move(_f)(std::forward<Args>(args)...)), void>) {
             std::move(_f)(std::forward<Args>(args)...);
             return std::monostate{};
@@ -83,7 +83,7 @@ constexpr auto invoke_prefix(F&& f, Tuple&& t) {
             return std::monostate{};
         }
     } else {
-        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) -> auto {
             if constexpr (std::is_void_v<decltype(std::invoke(f, std::move(std::get<Is>(t))...))>) {
                 std::invoke(f, std::move(std::get<Is>(t))...);
                 return std::monostate{};
@@ -139,7 +139,7 @@ constexpr auto move_tuple_tail_at(Tuple&& t) {
  */
 template <class Tuple>
 constexpr auto tuple_consume(Tuple&& values) {
-    return [_values = std::forward<Tuple>(values)]<typename F>(F&& f) mutable {
+    return [_values = std::forward<Tuple>(values)]<typename F>(F&& f) mutable -> auto {
         using tuple_t = std::decay_t<Tuple>;
         constexpr std::size_t N = std::tuple_size_v<tuple_t>;
 

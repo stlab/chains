@@ -16,8 +16,9 @@
 #include <variant> // monostate
 
 TEST_CASE("Test tuple compose", "[tuple]") {
-    std::tuple t{[](int x) { return x + 1.0; }, [](double x) { return x * 2.0; },
-                 [](double x) { return std::to_string(x / 2.0); }};
+    std::tuple t{[](int x) -> double { return x + 1.0; },
+                 [](double x) -> double { return x * 2.0; },
+                 [](double x) -> std::string { return std::to_string(x / 2.0); }};
     auto f = chains::tuple_compose(std::move(t));
     CHECK(f(1) == "2.000000");
 }
@@ -225,7 +226,8 @@ TEST_CASE("Test tuple consume", "[tuple]") {
         }
         SECTION("tuple<float> -> int(float)") {
             std::tuple t{3.14f};
-            auto result = chains::tuple_consume(t)([](float f) { return static_cast<int>(f); });
+            auto result =
+                chains::tuple_consume(t)([](float f) -> int { return static_cast<int>(f); });
             CHECK(result == std::make_tuple(3));
         }
     }
@@ -317,7 +319,7 @@ TEST_CASE("Test tuple consume", "[tuple]") {
             std::tuple t{1, 2, 3};
             auto hit{0};
             auto result =
-                chains::tuple_consume(t)([&hit](int a, int b, int c) { hit = a + b + c; });
+                chains::tuple_consume(t)([&hit](int a, int b, int c) -> void { hit = a + b + c; });
             CHECK(hit == 6);
             CHECK(result == std::make_tuple(std::monostate{}));
         }
@@ -410,7 +412,8 @@ TEST_CASE("Test tuple consume", "[tuple]") {
     SECTION("Complex return types") {
         SECTION("tuple<int> -> tuple(int)") {
             std::tuple t{42};
-            auto result = chains::tuple_consume(t)([](int x) { return std::make_tuple(x, x * 2); });
+            auto result = chains::tuple_consume(t)(
+                [](int x) -> std::tuple<int, int> { return std::make_tuple(x, x * 2); });
             // Result is tuple<tuple<int, int>> - a 1-element tuple containing a 2-element tuple
             auto nested = std::get<0>(result);
             CHECK(nested == std::make_tuple(42, 84));
@@ -419,8 +422,8 @@ TEST_CASE("Test tuple consume", "[tuple]") {
         }
         SECTION("tuple<int, int> -> pair(int, int)") {
             std::tuple t{3, 4};
-            auto result =
-                chains::tuple_consume(t)([](int a, int b) { return std::make_pair(a, b); });
+            auto result = chains::tuple_consume(t)(
+                [](int a, int b) -> std::pair<int, int> { return std::make_pair(a, b); });
             // Result is tuple<pair<int, int>> - a 1-element tuple containing a pair
             auto nested = std::get<0>(result);
             CHECK(nested == std::make_pair(3, 4));
