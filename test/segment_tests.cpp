@@ -23,7 +23,7 @@ struct mock_receiver {
     int _result{0};
 
     [[nodiscard]] auto canceled() const -> bool { return _canceled; }
-    auto set_exception(std::exception_ptr e) -> void { _exception = std::move(e); }
+    auto set_exception(const std::exception_ptr& e) -> void { _exception = e; }
     auto set_value(int value) -> void { _result = value; }
 };
 
@@ -31,21 +31,25 @@ TEST_CASE("Basic segment operations", "[segment]") {
     SECTION("simple creation with variadic constructor") {
         auto sut =
             chains::segment{chains::type<std::tuple<>>{}, [](auto f) { f(); }, []() { return 42; }};
+        (void)sut;
     }
 
     SECTION("simple creation with tuple constructor") {
         auto sut = chains::segment{chains::type<std::tuple<>>{}, [](auto f) { f(); },
                                    std::make_tuple([]() { return 42; })};
+        (void)sut;
     }
 
     SECTION("creation with multiple functions") {
         auto sut = chains::segment{chains::type<std::tuple<>>{}, [](auto f) { f(); },
                                    [](int x) { return x + 1; }, [](int x) { return x * 2; }};
+        (void)sut;
     }
 
     SECTION("creation with empty function tuple") {
         auto sut =
             chains::segment{chains::type<std::tuple<>>{}, [](auto f) { f(); }, std::tuple<>{}};
+        (void)sut;
     }
 }
 
@@ -157,10 +161,10 @@ TEST_CASE("Segment invoke with receiver", "[segment]") {
         auto hit = 0;
 
         // Custom applicator that doubles the argument
-        auto custom_apply = [](auto f, int x) { f(x * 2); };
+        auto custom_apply = [](auto f, int x) -> void { f(x * 2); };
 
         auto sut = chains::segment{chains::type<std::tuple<>>{}, std::move(custom_apply),
-                                   [&hit](int x) { hit = x; }};
+                                   [&hit](int x) -> void { hit = x; }};
 
         std::move(sut).invoke(receiver, 21);
         CHECK(hit == 42); // 21 * 2 = 42
@@ -185,12 +189,14 @@ TEST_CASE("Segment with injected types", "[segment]") {
         auto sut = chains::segment{chains::type<std::tuple<int>>{}, [](auto f) { f(); },
                                    []() { return 42; }};
         // Segment should be constructible with injection type
+        (void)sut;
     }
 
     SECTION("segment with multiple injection types") {
         auto sut = chains::segment{chains::type<std::tuple<int, std::string>>{},
                                    [](auto f) { f(); }, []() { return 42; }};
         // Segment should be constructible with multiple injection types
+        (void)sut;
     }
 }
 
@@ -199,6 +205,7 @@ TEST_CASE("Segment edge cases", "[segment]") {
         auto sut =
             chains::segment{chains::type<std::tuple<>>{}, [](auto f) { f(); }, std::tuple<>{}};
         // Should be constructible
+        (void)sut;
     }
 
     SECTION("segment with void function") {
