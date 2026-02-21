@@ -1,7 +1,7 @@
 #
 # This function will prevent in-source builds
 #
-function(chains_assure_out_of_source_builds)
+function(chain_assure_out_of_source_builds)
   # make sure the user doesn't play dirty with symlinks
   file(REAL_PATH "${CMAKE_SOURCE_DIR}" srcdir)
   file(REAL_PATH "${CMAKE_BINARY_DIR}" bindir)
@@ -16,4 +16,4 @@ function(chains_assure_out_of_source_builds)
   endif()
 endfunction()
 
-chains_assure_out_of_source_builds()
+chain_assure_out_of_source_builds()

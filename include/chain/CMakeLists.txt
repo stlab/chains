@@ -1,10 +1,10 @@
-target_sources( chains INTERFACE
+target_sources( chain INTERFACE
         FILE_SET headers
         TYPE HEADERS
         BASE_DIRS ../
         FILES
 
-        chains.hpp
+        chain.hpp
         config.hpp
         #on.hpp
         segment.hpp
@@ -15,7 +15,7 @@ target_sources( chains INTERFACE
         tuple.hpp
 )
 
-target_sources( chains INTERFACE
+target_sources( chain INTERFACE
         FILE_SET headers
         TYPE HEADERS
         BASE_DIRS ${PROJECT_BINARY_DIR}/include

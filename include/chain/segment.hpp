@@ -4,17 +4,17 @@
     (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-#ifndef CHAINS_SEGMENT_HPP
-#define CHAINS_SEGMENT_HPP
+#ifndef CHAIN_SEGMENT_HPP
+#define CHAIN_SEGMENT_HPP
 
-#include <chains/config.hpp>
-#include <chains/tuple.hpp>
+#include <chain/config.hpp>
+#include <chain/tuple.hpp>
 
 #include <exception>
 #include <tuple>
 #include <utility>
 
-namespace chains::inline CHAINS_VERSION_NAMESPACE() {
+namespace chain::inline CHAIN_VERSION_NAMESPACE() {
 
 template <class T>
 struct type {};
@@ -35,7 +35,7 @@ public:
     */
     template <class... Args>
     auto result_type_helper(Args&&... args) && {
-        return interpret(std::move(_functions))(std::forward<Args>(args)...);
+        return chain::interpret(std::move(_functions))(std::forward<Args>(args)...);
     }
 
     explicit segment(type<Injects>, Applicator&& apply, std::tuple<Fs...>&& functions)
@@ -55,7 +55,7 @@ public:
 
     template <class F>
     auto append(F&& f) && {
-        return chains::segment{
+        return chain::segment{
             type<Injects>{}, std::move(_apply),
             std::tuple_cat(std::move(_functions), std::tuple{std::forward<F>(f)})};
     }
@@ -73,7 +73,7 @@ public:
         // TODO: must handle this cancel prior to invoking the segment.
         // if (receiver.canceled()) return;
         return std::move(_apply)(
-            [_f = interpret(std::move(_functions)),
+            [_f = chain::interpret(std::move(_functions)),
              _receiver = std::forward<R>(receiver)]<typename... T>(T&&... args) mutable noexcept {
                 if (_receiver->canceled()) return;
                 try {
@@ -86,6 +86,6 @@ public:
     }
 };
 
-} // namespace chains::inline CHAINS_VERSION_NAMESPACE()
+} // namespace chain::inline CHAIN_VERSION_NAMESPACE()
 
 #endif

@@ -1,4 +1,4 @@
-macro(chains_configure_linker project_name)
+macro(chain_configure_linker project_name)
   set(alb_USER_LINKER_OPTION
     "DEFAULT"
       CACHE STRING "Linker to be used")

@@ -4,13 +4,13 @@ Copyright 2026 Adobe
   (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 
-#ifndef CHAINS_SYNC_WAIT_HPP
-#define CHAINS_SYNC_WAIT_HPP
+#ifndef CHAIN_SYNC_WAIT_HPP
+#define CHAIN_SYNC_WAIT_HPP
 
-#include <chains/config.hpp>
+#include <chain/config.hpp>
 
-namespace chains {
-inline namespace CHAINS_VERSION_NAMESPACE() {
+namespace chain {
+inline namespace CHAIN_VERSION_NAMESPACE() {
 
 template <class Chain, class... Args>
 auto sync_wait(Chain&& chain, Args&&... args) {
@@ -69,7 +69,7 @@ auto sync_wait(Chain&& chain, Args&&... args) {
    _then_ flag the condition that it is ready.
 */
 
-} // namespace CHAINS_VERSION_NAMESPACE()
-} // namespace chains
+} // namespace CHAIN_VERSION_NAMESPACE()
+} // namespace chain
 
 #endif

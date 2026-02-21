@@ -39,7 +39,7 @@
         },
         {
             "name": "conf-unixlike-common",
-            "description": "Unix-like OS settings for gcc and clang toolchains",
+            "description": "Unix-like OS settings for gcc and clang toolchain",
             "hidden": true,
             "inherits": "conf-common",
             "condition": {

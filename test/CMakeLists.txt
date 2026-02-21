@@ -9,9 +9,9 @@ project(CmakeConfigPackageTests
 if(PROJECT_IS_TOP_LEVEL OR TEST_INSTALLED_VERSION)
   enable_testing()
 
-  find_package(chains CONFIG REQUIRED) # for intro, project_options, ...
+  find_package(chain CONFIG REQUIRED) # for intro, project_options, ...
 
-  if(NOT TARGET chains_options)
+  if(NOT TARGET chain_options)
     message(FATAL_ERROR "Required config package not found!")
     return() # be strictly paranoid for Template Janitor github action! CK
   endif()
@@ -22,16 +22,16 @@ endif()
 include(${Catch2_SOURCE_DIR}/extras/Catch.cmake)
 
 add_executable(tests
-  chains_test.cpp
+  chain_test.cpp
   main.cpp
   segment_tests.cpp
   tuple_tests.cpp)
 
 target_link_libraries(
   tests
-  PRIVATE chains::chains_warnings
-          chains::chains_options
-          chains::chains
+  PRIVATE chain::chain_warnings
+          chain::chain_options
+          chain::chain
           stlab::stlab
           Catch2::Catch2WithMain)
 
@@ -62,9 +62,9 @@ catch_discover_tests(
 # add_executable(constexpr_tests constexpr_tests.cpp)
 # target_link_libraries(
 #   constexpr_tests
-#   PRIVATE chains::chains_warnings
-#           chains::chains_options
-#           chains::sample_library
+#   PRIVATE chain::chain_warnings
+#           chain::chain_options
+#           chain::sample_library
 #           Catch2::Catch2WithMain)
 
 # catch_discover_tests(
@@ -85,9 +85,9 @@ catch_discover_tests(
 # add_executable(relaxed_constexpr_tests constexpr_tests.cpp)
 # target_link_libraries(
 #   relaxed_constexpr_tests
-#   PRIVATE chains::chains_warnings
-#           chains::chains_options
-#           chains::sample_library
+#   PRIVATE chain::chain_warnings
+#           chain::chain_options
+#           chain::sample_library
 #           Catch2::Catch2WithMain)
 # target_compile_definitions(relaxed_constexpr_tests PRIVATE -DCATCH_CONFIG_RUNTIME_STATIC_REQUIRE)
 

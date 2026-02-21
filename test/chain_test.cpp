@@ -1,5 +1,5 @@
-#include <chains/chains.hpp>
-#include <chains/segment.hpp>
+#include <chain/chain.hpp>
+#include <chain/segment.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -9,15 +9,15 @@ TEST_CASE("Basic chain operations", "[chain]") {
     SECTION("Can instantiate a simple chain") {
         SECTION("Chain with two lambdas") {
             // Create a simple chain by piping a segment with a function
-            auto s = chains::segment{chains::type<void>{},
-                                     []<typename... Args>(auto&& f, Args&&... args) -> auto {
-                                         return f(std::forward<Args>(args)...);
-                                     },
-                                     [](int x) -> int { return x * 2; }};
+            auto s = chain::segment{chain::type<void>{},
+                                    []<typename... Args>(auto&& f, Args&&... args) -> auto {
+                                        return f(std::forward<Args>(args)...);
+                                    },
+                                    [](int x) -> int { return x * 2; }};
 
             auto c = std::move(s) | [](int x) -> int { return x + 1; };
 
-            // c is now a chains::chain instance
+            // c is now a chain::chain instance
             // We can verify it compiles and the type is deduced correctly
             (void)c; // Suppress unused variable warning
         }
@@ -32,7 +32,7 @@ TEST_CASE("Basic chain operations", "[chain]") {
 #include <thread>
 
 using namespace std;
-using namespace chains;
+using namespace chain;
 using namespace stlab;
 
 // Cancellation example
@@ -134,7 +134,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         REQUIRE(46 == val.member());
     }
 
-    GIVEN("a sequence of callables in a chain of chains synchronous") {
+    GIVEN("a sequence of callables in a chain of chain synchronous") {
         auto a0 = on(immediate_executor) | [](int x) { return x * 2; } | on(immediate_executor) |
                   [](int x) { return to_string(x); } | on(immediate_executor) |
                   [](const string& s) { return s + "!"; };
@@ -144,7 +144,7 @@ TEST_CASE("Initial draft", "[initial_draft]") {
         REQUIRE(val == string("84!"));
     }
 
-    GIVEN("a sequence of callables in a chain of chains asynchronous") {
+    GIVEN("a sequence of callables in a chain of chain asynchronous") {
         auto a0 = on(default_executor) | [](int x) { return x * 2; } | on(immediate_executor) |
                   [](int x) { return to_string(x); } | on(default_executor) |
                   [](const string& s) { return s + "!"; };
@@ -169,6 +169,6 @@ TEST_CASE("Cancellation of then()", "[initial_draft]") {
     std::this_thread::sleep_for(std::chrono::seconds{5});
     std::cout << cnt << std::endl;
 }
-} // namespace chains
+} // namespace chain
 
 #endif
